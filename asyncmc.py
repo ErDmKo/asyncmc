@@ -15,21 +15,25 @@ class Client(object):
     _FLAG_INTEGER = 1<<1
     _FLAG_LONG    = 1<<2
 
-    def __init__(self, servers, **kwargs):
+    def __init__(self, servers = ["127.0.0.1:11211"], debug=0, **kwargs):
+        self.debug = debug
         self.conn_pool = ConnectionPool(servers, **kwargs)
 
     def _debug(self, msg):
-        logging.debug(msg)
+        if self.debug:
+            logging.debug(msg)
 
     def _info(self, msg):
-        logging.info(msg)
+        if self.debug:
+            logging.info(msg)
 
     def _server(self, key):
+        self._debug('server call for key "{}"'.format(key))
         return self.conn_pool.reserve().get_server_for_key(key)
 
     def get(self, key, callback):
         server = self._server(key)
-        server.send_cmd("get %s" % (key,),
+        server.send_cmd("get {}".format(key).encode(),
             functools.partial(self._get_callback_write, server=server, callback=callback))
 
     def _get_callback_write(self, server, callback):
@@ -73,8 +77,9 @@ class Client(object):
     def get_multi(self, keys, callback):
         pass
 
-    def set(self, key, value, timeout, callback):
+    def set(self, key, value, timeout=0, callback = lambda rez: rez):
         assert isinstance(timeout, int)
+        self._info('insert key {}'.format(key))
 
         server = self._server(key)
         flags = 0
@@ -82,23 +87,19 @@ class Client(object):
             pass
         elif isinstance(value, int):
             flags |= Client._FLAG_INTEGER
-            value = "%d" % value
-        elif isinstance(val, long):
-            flags |= Client._FLAG_LONG
-            value = "%d" % value
+            value = str(value).encode()
         else:
             flags |= Client._FLAG_PICKLE
             value = pickle.dumps(value, 2)
-
+        logging.info(value)
         str_info = {
             'key': key,
             'flags': flags,
             'timeout': timeout,
             'length': len(value),
-            'value': value
             }
- 
-        server.send_cmd("set {key} {flags} {timeout} {length:d}\r\n{value}".format(**str_info),
+        server.send_cmd("set {key} {flags} {timeout}\
+                {length:d}\r\n".format(**str_info).encode()+value,
             functools.partial(self._set_callback_write, server=server, callback=callback))
 
     def _set_callback_write(self, server, callback):
@@ -106,6 +107,7 @@ class Client(object):
             functools.partial(self._set_callback_read, server=server, callback=callback))
 
     def _set_callback_read(self, result, server, callback):
+        logging.info('read {}'.format(result))
         callback(result)
         self.conn_pool.release(server.conn)
 
@@ -119,7 +121,7 @@ class Client(object):
             cmd += " %d" % (timeout,)
 
         server.send_cmd(
-            cmd,
+            cmd.encode(),
             functools.partial(
                 self._delete_callback_write,
                 callback=callback,
@@ -189,11 +191,11 @@ class Host(object):
             return None
         self.sock = s
         self.stream = tornado.iostream.IOStream(s)
-        self.stream.debug=True
+        self.stream.debug = True
 
     def send_cmd(self, cmd, callback):
         self._ensure_connection()
-        cmd = (cmd + "\r\n").encode('ascii')
+        cmd = cmd + "\r\n".encode()
         self.stream.write(cmd, callback)
 
 if __name__ == "__main__":
@@ -203,22 +205,31 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    c =  Client(["127.0.0.1:11211"])
+    c =  Client(["127.0.0.1:11211"], debug=1)
+
     def _set_cb(res):
         print("Set callback", res)
 
         def _get_cb(res):
             print("Get callback!", res)
-            c.get("bar", lambda r: logging.info("get bar cb "+str(r)))
-            c.delete('foo', 0, lambda r: c.get('foo', lambda r1: logging.info('get_deleted \
-                {} info {}'.format(r1, r))))
+            #c.get("bar", lambda r: logging.info("get bar cb "+str(r)))
+            #c.delete('foo', 0, lambda r: c.get('foo', lambda r1: logging.info('get_deleted \
+            #    {} info {}'.format(r1, r))))
 
         c.get("foo", _get_cb)
+
+    def stop(*ar, **kw):
+        logging.info((ar, kw))
+        server.stop()
 
     value = random.randint(1, 100)
     print("Setting value {0}".format(value))
     c.set("foo", value, 0, _set_cb)
+    c.set("bara", {'1': '1'}, 1000, lambda res: stop(server))
+    server = tornado.ioloop.IOLoop.instance()
+    server.start()
     import time
-    time.sleep(1)
-
-    tornado.ioloop.IOLoop.instance().start()
+    time.sleep(2)
+    c.get('bara', lambda res: stop(res))
+    server = tornado.ioloop.IOLoop.instance()
+    server.start()
