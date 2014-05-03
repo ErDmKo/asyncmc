@@ -112,10 +112,10 @@ class Client(object):
     def set_multi(self, mapping, callback):
         pass
 
-    def delete(self, key, timeout, callback):
+    def delete(self, key, timeout=0, callback = lambda r: r):
         server = self._server(key)
         cmd = "delete %s" % (key,)
-        if time:
+        if timeout:
             cmd += " %d" % (timeout,)
 
         server.send_cmd(
@@ -128,7 +128,8 @@ class Client(object):
         )
 
     def _delete_callback_write(self, server, callback):
-        pass
+        server.stream.read_until(b"\r\n",
+            functools.partial(self._set_callback_read, server=server, callback=callback))
 
     def delete_multi(self, keys, callback):
         pass
@@ -193,7 +194,7 @@ class Host(object):
     def send_cmd(self, cmd, callback):
         self._ensure_connection()
         cmd = (cmd + "\r\n").encode('ascii')
-        self.stream.write(cmd,  callback)
+        self.stream.write(cmd, callback)
 
 if __name__ == "__main__":
 
@@ -209,11 +210,15 @@ if __name__ == "__main__":
         def _get_cb(res):
             print("Get callback!", res)
             c.get("bar", lambda r: logging.info("get bar cb "+str(r)))
+            c.delete('foo', 0, lambda r: c.get('foo', lambda r1: logging.info('get_deleted \
+                {} info {}'.format(r1, r))))
 
         c.get("foo", _get_cb)
 
     value = random.randint(1, 100)
     print("Setting value {0}".format(value))
     c.set("foo", value, 0, _set_cb)
+    import time
+    time.sleep(1)
 
     tornado.ioloop.IOLoop.instance().start()
