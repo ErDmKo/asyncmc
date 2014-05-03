@@ -33,18 +33,18 @@ class Client(object):
             functools.partial(self._get_callback_write, server=server, callback=callback))
 
     def _get_callback_write(self, server, callback):
-        server.stream.read_until("\r\n",
+        server.stream.read_until(b"\r\n",
             functools.partial(self._get_callback_read, server=server, callback=callback))
 
     def _get_callback_read(self, result, server, callback):
         self._debug("_get_callback_read `%s`" % (result,))
-        if result[:3] == "END":
+        if result[:3] == b"END":
             self.conn_pool.release(server.conn)
             return callback(None)
-        elif result[:5] == "VALUE":
-            flag, length = result.split(" ")[2:]
+        elif result[:5] == b"VALUE":
+            flag, length = result.split(b" ")[2:]
             server.stream.read_until(
-                "END",
+                b"END",
                 functools.partial(
                     self._get_callback_value,
                     server=server,
@@ -52,13 +52,12 @@ class Client(object):
                     flag=int(flag)
                 )
             )
-            callback(result)
         else:
             logging.error("Bad response from memcache %s" % (result,))
             self.conn_pool.release(server.conn)
 
     def _get_callback_value(self, result, flag, server, callback):
-        result = result.replace("\r\nEND", "")
+        result = result.replace(b"\r\nEND", b"")
         self.conn_pool.release(server.conn)
 
         if flag == 0:
@@ -69,7 +68,6 @@ class Client(object):
             value = long(result)
         elif flag & Client._FLAG_PICKLE:
             value = pickle.loads(result)
-
         callback(value)
 
     def get_multi(self, keys, callback):
@@ -80,7 +78,7 @@ class Client(object):
 
         server = self._server(key)
         flags = 0
-        if isinstance(value, types.StringTypes):
+        if isinstance(value, str):
             pass
         elif isinstance(value, int):
             flags |= Client._FLAG_INTEGER
@@ -91,12 +89,20 @@ class Client(object):
         else:
             flags |= Client._FLAG_PICKLE
             value = pickle.dumps(value, 2)
+
+        str_info = {
+            'key': key,
+            'flags': flags,
+            'timeout': timeout,
+            'length': len(value),
+            'value': value
+            }
  
-        server.send_cmd("set %s %d %d %d\r\n%s" % (key, flags, timeout, len(value), value),
+        server.send_cmd("set {key} {flags} {timeout} {length:d}\r\n{value}".format(**str_info),
             functools.partial(self._set_callback_write, server=server, callback=callback))
 
     def _set_callback_write(self, server, callback):
-        server.stream.read_until("\r\n",
+        server.stream.read_until(b"\r\n",
             functools.partial(self._set_callback_read, server=server, callback=callback))
 
     def _set_callback_read(self, result, server, callback):
@@ -177,17 +183,17 @@ class Host(object):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             s.connect((self.host, self.port))
-        except socket.error, msg:
-            print msg
+        except socket.error as msg:
+            print(msg)
             return None
-
         self.sock = s
         self.stream = tornado.iostream.IOStream(s)
         self.stream.debug=True
 
     def send_cmd(self, cmd, callback):
         self._ensure_connection()
-        self.stream.write(cmd + "\r\n", callback)
+        cmd = (cmd + "\r\n").encode('ascii')
+        self.stream.write(cmd,  callback)
 
 if __name__ == "__main__":
 
@@ -196,18 +202,18 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    c =  Client(["127.0.0.1:11211", "127.0.0.1:11212"])
+    c =  Client(["127.0.0.1:11211"])
     def _set_cb(res):
-        print "Set callback", res
+        print("Set callback", res)
 
         def _get_cb(res):
-            print "Get callback", res
+            print("Get callback!", res)
             c.get("bar", lambda r: logging.info("get bar cb "+str(r)))
 
         c.get("foo", _get_cb)
 
     value = random.randint(1, 100)
-    print "Setting value %s" % (value,)
+    print("Setting value {0}".format(value))
     c.set("foo", value, 0, _set_cb)
 
     tornado.ioloop.IOLoop.instance().start()
