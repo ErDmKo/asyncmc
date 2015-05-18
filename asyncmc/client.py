@@ -6,6 +6,27 @@ import pickle
 import time
 from tornado.concurrent import Future
 from .pool import ConnectionPool
+from . import constants as const
+from .exceptions import ClientException
+from tornado import gen
+
+
+def acquire(func):
+
+    @gen.coroutine
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        conn = yield self.pool.acquire()
+        try:
+            res = yield func(self, conn, *args, **kwargs)
+            return res
+        except Exception as exc:
+            print(exc)
+            raise
+        finally:
+            self.pool.release(conn)
+
+    return wrapper
 
 
 class Client(object):
@@ -14,10 +35,50 @@ class Client(object):
     _FLAG_INTEGER = 1 << 1
     _FLAG_LONG = 1 << 2
 
-    def __init__(self, servers=["memcached:11211"], debug=0, **kwargs):
+    @acquire
+    @gen.coroutine
+    def stats(self, conn, args=None):
+        """Runs a stats command on the server."""
+        # req  - stats [additional args]\r\n
+        # resp - STAT <name> <value>\r\n (one per result)
+        #        END\r\n
+        if args is None:
+            args = b''
+        cmd = b''.join((b'stats ', args))
+        resp = yield conn.send_cmd(cmd)
+        result = {}
+        while resp != b'END\r\n':
+            terms = resp.split()
+
+            if len(terms) == 2 and terms[0] == b'STAT':
+                result[terms[1]] = None
+            elif len(terms) == 3 and terms[0] == b'STAT':
+                result[terms[1]] = terms[2]
+            else:
+                raise ClientException('stats failed', resp)
+
+            resp = yield conn.get_stream(cmd).read_until(b'\r\n')
+
+        return result
+
+    @acquire
+    @gen.coroutine
+    def version(self, conn):
+        """Current version of the server.
+
+        :return: ``bytes``, memcached version for current the server.
+        """
+        command = b'version'
+        response = yield conn.send_cmd(command)
+        if not response.startswith(const.VERSION):
+            raise ClientException('Memcached version failed', response)
+        version, number = response.split()
+        return number
+
+    def __init__(self, servers=["localhost:11211"], debug=0, **kwargs):
         self.debug = debug
         self.io_loop = tornado.ioloop.IOLoop.instance()
-        self.conn_pool = ConnectionPool(servers, debug=debug, **kwargs)
+        self.pool = ConnectionPool(servers, debug=debug, **kwargs)
 
     def _debug(self, msg):
         if self.debug:

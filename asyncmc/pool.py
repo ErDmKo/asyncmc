@@ -5,8 +5,6 @@ import tornado.iostream
 from tornado import gen
 from toro import Queue, Full, Empty
 
-from tornado.concurrent import Future
-
 
 class ConnectionPool(object):
 
@@ -62,11 +60,6 @@ class ConnectionPool(object):
         conn = yield Connection.get_conn(self._servers, self._debug)
         return conn
 
-    def reserve(self):
-        conn = self.idle.popleft()
-        self.in_use.append(conn)
-        return conn
-
     def release(self, conn):
         self._in_use.remove(conn)
         try:
@@ -85,6 +78,16 @@ class Connection(object):
     @gen.coroutine
     def get_conn(cls, servers, debug=0):
         return cls(servers, debug=debug)
+
+    @gen.coroutine
+    def send_cmd(self, cmd, *arg, **kw):
+        res = yield self.hosts[hash(cmd) % len(self.hosts)] \
+            .send_cmd(cmd, *arg, **kw)
+        return res
+
+    def get_stream(self, cmd, *arg, **kw):
+        return self.hosts[hash(cmd) % len(self.hosts)] \
+            .stream
 
     def close_socket(self):
         for host in self.hosts:
@@ -112,6 +115,7 @@ class Host(object):
 
         self.sock = None
 
+    @gen.coroutine
     def _ensure_connection(self):
         if self.sock:
             return
@@ -132,16 +136,10 @@ class Host(object):
             self.sock.close()
             self.sock = None
 
-    def send_cmd(self, cmd, callback):
-        logging.info(cmd)
-        self._ensure_connection()
+    @gen.coroutine
+    def send_cmd(self, cmd, callback=lambda: False):
+        yield self._ensure_connection()
         cmd = cmd + "\r\n".encode()
-        fut = Future()
-
-        def close_con(*ar, **kw):
-            new_fut = callback(*ar, **kw)
-            self._info('con future {}'.format(new_fut))
-            tornado.concurrent.chain_future(new_fut, fut)
-        self.stream.write(cmd, close_con)
-        fut.add_done_callback(self.close_socket)
-        return fut
+        response = yield self.stream.write(cmd)
+        response = yield self.stream.read_until(b'\r\n')
+        return response[:-2]
