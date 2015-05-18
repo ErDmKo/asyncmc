@@ -4,11 +4,11 @@ PYFLAKES=pyflakes
 flake:
 	$(PYFLAKES) .
 
-test:
-	$(PYTHON) runtests.py $(FILTER)
-
 pep:
 	pep8 asyncmc examples tests
+
+test: pep flake
+	$(PYTHON) runtests.py -v 5 $(FILTER)
 
 testloop: pep flake
 	$(PYTHON) runtests.py --forever $(FILTER)

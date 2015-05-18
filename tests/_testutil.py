@@ -1,6 +1,5 @@
 from functools import wraps
 import tornado.ioloop
-from tornado.concurrent import Future
 from tornado import gen
 import unittest
 
@@ -9,15 +8,11 @@ def run_until_complete(fun):
 
     @wraps(fun)
     def wrapper(test, *args, **kw):
-        fut = Future()
-
         @gen.coroutine
         def out():
-            res = fun(test, *args, **kw)
-            fut.set_result(res)
+            return fun(test, *args, **kw)
         test.loop._stopped = False
         test.loop.run_sync(out)
-        return fut.result()
     return wrapper
 
 
