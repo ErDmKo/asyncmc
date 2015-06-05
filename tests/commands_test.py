@@ -1,6 +1,10 @@
 from time import sleep
+
+from unittest.mock import patch
+from tornado.concurrent import Future
+
+from asyncmc.client import Client, ClientException
 from ._testutil import BaseTest, run_until_complete
-from asyncmc.client import Client
 
 
 class ConnectionCommandsTest(BaseTest):
@@ -38,7 +42,8 @@ class ConnectionCommandsTest(BaseTest):
 
         with patch.object(self.mcache, '_execute_simple_command') as patched, \
                 self.assertRaises(ClientException):
-            fut = asyncio.Future(loop=self.loop)
+            fut = Future()
+            self.loop.add_future(fut)
             fut.set_result(b'SERVER_ERROR error\r\n')
             patched.return_value = fut
-            yield from self.mcache.flush_all()
+            yield self.mcache.flush_all()

@@ -17,7 +17,8 @@ class ConnectionPool(object):
         if debug:
             logging.basicConfig(
                 level=logging.DEBUG,
-                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                format="'%(levelname)s %(asctime)s"
+                " %(module)s:%(lineno)d %(process)d %(thread)d %(message)s'"
             )
         self._loop = loop
         self._servers = servers
@@ -50,7 +51,11 @@ class ConnectionPool(object):
         conn = None
         while not conn:
             if not self._pool.empty():
+                logging.info('reuse')
                 conn = yield self._pool.get()
+
+            if conn is None:
+                conn = yield self._create_new_conn()
 
         self._in_use.add(conn)
         return conn
@@ -86,8 +91,9 @@ class Connection(object):
         return res
 
     def get_stream(self, cmd, *arg, **kw):
-        return self.hosts[hash(cmd) % len(self.hosts)] \
-            .stream
+        hosts = self.hosts[hash(cmd) % len(self.hosts)] \
+            ._ensure_connection()
+        return hosts.stream
 
     def close_socket(self):
         for host in self.hosts:
@@ -115,10 +121,9 @@ class Host(object):
 
         self.sock = None
 
-    @gen.coroutine
     def _ensure_connection(self):
         if self.sock:
-            return
+            return self
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -129,6 +134,7 @@ class Host(object):
         self.sock = s
         self.stream = tornado.iostream.IOStream(s)
         self.stream.debug = True
+        return self
 
     def close_socket(self):
         if self.sock:
@@ -138,8 +144,10 @@ class Host(object):
 
     @gen.coroutine
     def send_cmd(self, cmd, callback=lambda: False):
-        yield self._ensure_connection()
+        self._ensure_connection()
         cmd = cmd + "\r\n".encode()
-        response = yield self.stream.write(cmd)
+        logging.info(cmd)
+        self.stream.write(cmd)
         response = yield self.stream.read_until(b'\r\n')
+        logging.info(response[:-2])
         return response[:-2]
