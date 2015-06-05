@@ -51,7 +51,6 @@ class ConnectionPool(object):
         conn = None
         while not conn:
             if not self._pool.empty():
-                logging.info('reuse')
                 conn = yield self._pool.get()
 
             if conn is None:

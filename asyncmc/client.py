@@ -89,6 +89,29 @@ class Client(object):
 
     @acquire
     @gen.coroutine
+    def multi_get(self, conn, *keys):
+        """Takes a list of keys and returns a list of values.
+
+        :param keys: ``list`` keys for the item being fetched.
+        :return: ``list`` of values for the specified keys.
+        :raises:``ValidationException``, ``ClientException``,
+        and socket errors
+        """
+        result = yield self._multi_get(conn, *keys)
+        return result
+
+    @acquire
+    @gen.coroutine
+    def flush_all(self, conn):
+        """Its effect is to invalidate all existing items immediately"""
+        command = b'flush_all'
+        response = yield conn.send_cmd(command)
+
+        if const.OK != response:
+            raise ClientException('Memcached flush_all failed', response)
+
+    @acquire
+    @gen.coroutine
     def get(self, conn, key, default=None):
         """Gets a single value from the server.
 

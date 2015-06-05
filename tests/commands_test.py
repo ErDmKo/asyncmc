@@ -1,9 +1,6 @@
 from time import sleep
 
-from unittest.mock import patch
-from tornado.concurrent import Future
-
-from asyncmc.client import Client, ClientException
+from asyncmc.client import Client
 from ._testutil import BaseTest, run_until_complete
 
 
@@ -40,10 +37,25 @@ class ConnectionCommandsTest(BaseTest):
         test_value = yield self.mcache.get(key)
         self.assertEqual(test_value, None)
 
-        with patch.object(self.mcache, '_execute_simple_command') as patched, \
-                self.assertRaises(ClientException):
-            fut = Future()
-            self.loop.add_future(fut)
-            fut.set_result(b'SERVER_ERROR error\r\n')
-            patched.return_value = fut
-            yield self.mcache.flush_all()
+    @run_until_complete
+    def test_set_get(self):
+        key, value = b'key:set', b'1'
+        yield self.mcache.set(key, value)
+        test_value = yield self.mcache.get(key)
+        self.assertEqual(test_value, value)
+        test_value = yield self.mcache.get(b'not:' + key)
+        self.assertEqual(test_value, None)
+
+    @run_until_complete
+    def test_multi_get(self):
+        key1, value1 = b'key:multi_get:1', b'1'
+        key2, value2 = b'key:multi_get:2', b'2'
+        yield self.mcache.set(key1, value1)
+        yield self.mcache.set(key2, value2)
+        test_value = yield self.mcache.multi_get(key1, key2)
+        self.assertEqual(test_value, [value1, value2])
+
+        test_value = yield self.mcache.multi_get(b'not' + key1, key2)
+        self.assertEqual(test_value, [None, value2])
+        test_value = yield self.mcache.multi_get()
+        self.assertEqual(test_value, [])
