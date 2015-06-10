@@ -3,7 +3,7 @@ Asyncmc
 
 
 `Asyncmc <https://github.com/ErDmKo/asyncmc>`_ is a memcached client for `Tornado <https://github.com/tornadoweb/tornado>`__ web framework.
-Asyncmc work with python 2.7 and pyton3
+Asyncmc work with python 2.7 and python 3
 
 Quick links
 ===========
@@ -45,7 +45,7 @@ Requires
 
 + `Tornado <https://github.com/tornadoweb/tornado>`__
 + `Memcached <http://memcached.org/>`_
-
+ 
 
 LICENSE
 =======

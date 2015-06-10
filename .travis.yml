@@ -1,0 +1,15 @@
+language: python
+services: memcached
+python:
+  - "2.7"
+  - "3.3"
+  - "3.4"
+
+install:
+  - python setup.py install
+  - pip install pyflakes
+  - pip install pep8
+
+script:
+  - pep8 asyncmc
+  - python -m unittest discover -v

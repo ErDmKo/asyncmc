@@ -4,8 +4,11 @@ PYFLAKES=pyflakes
 pep:
 	pep8 asyncmc examples tests
 
-test27: pep
+flake:
+	$(PYFLAKES) asyncmc examples tests
+
+test27: pep flake
 	$(PYTHON) -m unittest discover -v $(FILTER)
 
-test: pep 
+test: pep flake
 	$(PYTHON) -m unittest discover -v $(FILTER)
