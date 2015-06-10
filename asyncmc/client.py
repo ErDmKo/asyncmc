@@ -1,6 +1,7 @@
 import tornado.ioloop
 import functools
-import logging
+import pickle
+import json
 import re
 from .pool import ConnectionPool
 from . import constants as const
@@ -17,9 +18,6 @@ def acquire(func):
         try:
             res = yield func(self, conn, *args, **kwargs)
             raise gen.Return(res)
-        except Exception as exc:
-            print(exc)
-            raise
         finally:
             self.pool.release(conn)
 
@@ -27,10 +25,6 @@ def acquire(func):
 
 
 class Client(object):
-
-    _FLAG_PICKLE = 1 << 0
-    _FLAG_INTEGER = 1 << 1
-    _FLAG_LONG = 1 << 2
 
     def __init__(self, servers=["localhost:11211"], debug=0, **kwargs):
         self.debug = debug
@@ -135,10 +129,30 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
-        logging.info('insert key {}'.format(key))
+        flag = 0
+        if isinstance(value, str):
+            pass
+        elif isinstance(value, bytes):
+            pass
+        elif isinstance(value, bool):
+            flag |= const.FLAG_BOOLEAN
+            value = str(int(value)).encode('utf-8')
+        elif isinstance(value, int):
+            flag |= const.FLAG_INTEGER
+            value = str(value).encode('utf-8')
+        else:
+            try:
+                value = json.dumps(value).encode('utf-8')
+                flag |= const.FLAG_JSON
+            except Exception as e:
+                value = pickle.dumps(value, 2)
+                flag |= const.FLAG_PICKLE
+
+        if not isinstance(value, bytes):
+            value = bytes(value)
+
         resp = yield self._storage_command(
-            conn, b'set', key, value, 0, exptime)
-        logging.info(resp)
+            conn, b'set', key, value, flag, exptime)
         raise gen.Return(resp)
 
     @gen.coroutine
@@ -151,18 +165,14 @@ class Client(object):
         if not keys:
             raise gen.Return([])
 
-        logging.info('multi_get keys {}'.format(not keys))
         [self._validate_key(key) for key in keys]
         if len(set(keys)) != len(keys):
             raise ClientException('duplicate keys passed to multi_get')
         stream = conn.get_stream('1')  # TODO more streams
         cmd = b'get ' + b' '.join(keys) + b'\r\n'
-        logging.info(cmd)
         yield stream.write(cmd)
-        logging.info(cmd)
         received = {}
         line = yield stream.read_until(b'\n')
-        logging.info(line)
         while line != b'END\r\n':
             terms = line.split()
 
@@ -171,11 +181,24 @@ class Client(object):
                 flags = int(terms[2])
                 length = int(terms[3])
 
-                if flags != 0:
-                    raise ClientException('received non zero flags')
-
                 val = yield stream.read_bytes(length+2)
                 val = val[:-2]
+
+                if flags == 0:
+                    pass
+                elif flags & const.FLAG_INTEGER:
+                    val = int(val)
+                elif flags & const.FLAG_JSON:
+                    val = json.loads(val.decode('utf-8'))
+                elif flags & const.FLAG_PICKLE:
+                    val = pickle.loads(val)
+                elif flags & const.FLAG_BOOLEAN:
+                    val = bool(int(val))
+                else:
+                    val = False
+
+                if val is False and not flags & const.FLAG_BOOLEAN:
+                    raise ClientException('Unknown flag from server')
                 if key in received:
                     raise ClientException('duplicate results from server')
 
@@ -189,10 +212,6 @@ class Client(object):
             raise ClientException('received too many responses')
         res = [received.get(k, None) for k in keys]
         raise gen.Return(res)
-
-    def _info(self, msg):
-        if self.debug:
-            logging.info(msg)
 
     @gen.coroutine
     def _storage_command(self, conn, command, key, value,

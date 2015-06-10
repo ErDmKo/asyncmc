@@ -1,5 +1,5 @@
-import logging
 import socket
+import logging
 import tornado.ioloop
 import tornado.iostream
 from tornado import gen
@@ -7,10 +7,6 @@ from toro import Queue, Full, Empty
 
 
 class ConnectionPool(object):
-
-    def _info(self, msg):
-        if self._debug:
-            logging.debug(msg)
 
     def __init__(self, servers, maxsize=15, minsize=1, loop=None, debug=0):
         loop = loop if loop is not None else tornado.ioloop.IOLoop.instance()
@@ -104,10 +100,6 @@ class Connection(object):
 
 class Host(object):
 
-    def _info(self, msg):
-        if self.debug:
-            logging.info(msg)
-
     def __init__(self, host, conn, debug=0):
         self.debug = debug
         self.conn = conn
@@ -145,8 +137,6 @@ class Host(object):
     def send_cmd(self, cmd, callback=lambda: False):
         self._ensure_connection()
         cmd = cmd + "\r\n".encode()
-        logging.info(cmd)
         self.stream.write(cmd)
         response = yield self.stream.read_until(b'\r\n')
-        logging.info(response[:-2])
         raise gen.Return(response[:-2])

@@ -1,5 +1,6 @@
 from time import sleep
 import logging
+from collections import defaultdict
 
 from asyncmc.client import Client
 from ._testutil import BaseTest, run_until_complete
@@ -24,6 +25,22 @@ class ConnectionCommandsTest(BaseTest):
         version = yield self.mcache.version()
         stats = yield self.mcache.stats()
         self.assertEqual(version, stats[b'version'])
+
+    @run_until_complete
+    def test_set_typed(self):
+        value = {
+            b'array': [],
+            b'dict': {'a': 'b'},
+            b'init': 12313,
+            b'boolean': False,
+            b'custom_type': set([1, 4, 4])
+        }
+        yield [self.mcache.set(key, value) for key, value in value.items()]
+        values = yield dict([
+            (key, self.mcache.get(key)) for key, value in value.items()
+        ])
+        for key, val in value.items():
+            self.assertEqual(val, values[key])
 
     @run_until_complete
     def test_flush_all(self):

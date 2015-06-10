@@ -8,9 +8,6 @@ pep:
 	pep8 asyncmc examples tests
 
 test27: pep 
-	$(PYTHON) -m unittest discover -v
+	$(PYTHON) -m unittest discover -v $(FILTER)
 test: pep 
-	$(PYTHON) runtests.py -v 5 $(FILTER)
-
-testloop: pep flake
-	$(PYTHON) runtests.py --forever $(FILTER)
+	$(PYTHON) -m unittest discover -v $(FILTER)
