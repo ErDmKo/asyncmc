@@ -16,7 +16,7 @@ def acquire(func):
         conn = yield self.pool.acquire()
         try:
             res = yield func(self, conn, *args, **kwargs)
-            return res
+            raise gen.Return(res)
         except Exception as exc:
             print(exc)
             raise
@@ -71,7 +71,7 @@ class Client(object):
 
             resp = yield conn.get_stream(cmd).read_until(b'\r\n')
 
-        return result
+        raise gen.Return(result)
 
     @acquire
     @gen.coroutine
@@ -85,7 +85,7 @@ class Client(object):
         if not response.startswith(const.VERSION):
             raise ClientException('Memcached version failed', response)
         version, number = response.split()
-        return number
+        raise gen.Return(number)
 
     @acquire
     @gen.coroutine
@@ -98,7 +98,7 @@ class Client(object):
         and socket errors
         """
         result = yield self._multi_get(conn, *keys)
-        return result
+        raise gen.Return(result)
 
     @acquire
     @gen.coroutine
@@ -120,7 +120,8 @@ class Client(object):
         :return: ``bytes``, is the data for this specified key.
         """
         result = yield self._multi_get(conn, key)
-        return result[0] if result else default
+        result = result[0] if result else default
+        raise gen.Return(result)
 
     @acquire
     @gen.coroutine
@@ -134,10 +135,11 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
-        self._info('insert key {}'.format(key))
+        logging.info('insert key {}'.format(key))
         resp = yield self._storage_command(
             conn, b'set', key, value, 0, exptime)
-        return resp
+        logging.info(resp)
+        raise gen.Return(resp)
 
     @gen.coroutine
     def _multi_get(self, conn, *keys):
@@ -147,13 +149,15 @@ class Client(object):
         #        [...]
         #        END\r\n
         if not keys:
-            return []
+            raise gen.Return([])
 
+        logging.info('multi_get keys {}'.format(not keys))
         [self._validate_key(key) for key in keys]
         if len(set(keys)) != len(keys):
             raise ClientException('duplicate keys passed to multi_get')
         stream = conn.get_stream('1')  # TODO more streams
         cmd = b'get ' + b' '.join(keys) + b'\r\n'
+        logging.info(cmd)
         yield stream.write(cmd)
         logging.info(cmd)
         received = {}
@@ -183,7 +187,8 @@ class Client(object):
 
         if len(received) > len(keys):
             raise ClientException('received too many responses')
-        return [received.get(k, None) for k in keys]
+        res = [received.get(k, None) for k in keys]
+        raise gen.Return(res)
 
     def _info(self, msg):
         if self.debug:
@@ -215,7 +220,7 @@ class Client(object):
 
         if resp not in (const.STORED, const.NOT_STORED):
             raise ClientException('stats {} failed'.format(command), resp)
-        return resp == const.STORED
+        raise gen.Return(resp == const.STORED)
 
     def _validate_key(self, key):
         if not isinstance(key, bytes):  # avoid bugs subtle and otherwise

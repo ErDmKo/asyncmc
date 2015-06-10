@@ -57,12 +57,12 @@ class ConnectionPool(object):
                 conn = yield self._create_new_conn()
 
         self._in_use.add(conn)
-        return conn
+        raise gen.Return(conn)
 
     @gen.coroutine
     def _create_new_conn(self):
         conn = yield Connection.get_conn(self._servers, self._debug)
-        return conn
+        raise gen.Return(conn)
 
     def release(self, conn):
         self._in_use.remove(conn)
@@ -87,7 +87,7 @@ class Connection(object):
     def send_cmd(self, cmd, *arg, **kw):
         res = yield self.hosts[hash(cmd) % len(self.hosts)] \
             .send_cmd(cmd, *arg, **kw)
-        return res
+        raise gen.Return(res)
 
     def get_stream(self, cmd, *arg, **kw):
         hosts = self.hosts[hash(cmd) % len(self.hosts)] \
@@ -149,4 +149,4 @@ class Host(object):
         self.stream.write(cmd)
         response = yield self.stream.read_until(b'\r\n')
         logging.info(response[:-2])
-        return response[:-2]
+        raise gen.Return(response[:-2])

@@ -1,4 +1,4 @@
-PYTHON=python3
+PYTHON=python
 PYFLAKES=pyflakes
 
 flake:
@@ -7,7 +7,9 @@ flake:
 pep:
 	pep8 asyncmc examples tests
 
-test: pep flake
+test27: pep 
+	$(PYTHON) -m unittest discover -v
+test: pep 
 	$(PYTHON) runtests.py -v 5 $(FILTER)
 
 testloop: pep flake

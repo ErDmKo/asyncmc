@@ -1,4 +1,5 @@
 from time import sleep
+import logging
 
 from asyncmc.client import Client
 from ._testutil import BaseTest, run_until_complete
@@ -6,12 +7,12 @@ from ._testutil import BaseTest, run_until_complete
 
 class ConnectionCommandsTest(BaseTest):
     def setUp(self):
-        super().setUp()
+        super(ConnectionCommandsTest, self).setUp()
         self.mcache = Client(debug=1)
 
     def tearDown(self):
         yield self.mcache.close()
-        super().tearDown()
+        super(ConnectionCommandsTest, self).tearDown()
 
     @run_until_complete
     def test_utils(self):
@@ -30,6 +31,7 @@ class ConnectionCommandsTest(BaseTest):
         yield self.mcache.set(key, value)
         # make sure value exists
         test_value = yield self.mcache.get(key)
+        logging.info(test_value)
         self.assertEqual(test_value, value)
         # flush data
         yield self.mcache.flush_all()
