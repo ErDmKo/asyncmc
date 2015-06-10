@@ -1,4 +1,4 @@
-Asyncmc  [![build status](https://travis-ci.org/ErDmKo/asyncmc.svg?branch=master)](https://travis-ci.org/ErDmKo/asyncmc/)
+Asyncmc  image::https://travis-ci.org/ErDmKo/asyncmc.svg?branch=master
 ====================
 
 
