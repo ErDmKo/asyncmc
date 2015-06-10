@@ -2,11 +2,12 @@ import tornado.ioloop
 from tornado import gen
 import asyncmc
 
-loop = tornado.ioloop.IOLoop.instance()
+i_loop = tornado.ioloop.IOLoop.instance()
+
 
 @gen.coroutine
 def out():
-    mc = asyncmc.Client(servers=['localhost:11211'], loop=loop)
+    mc = asyncmc.Client(servers=['localhost:11211'], loop=i_loop)
     yield mc.set(b"some_key", b"Some value")
     value = yield mc.get(b"some_key")
     print(value)
@@ -14,4 +15,4 @@ def out():
     print(values)
     yield mc.delete(b"another_key")
 
-loop.run_sync(out)
+i_loop.run_sync(out)

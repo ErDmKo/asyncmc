@@ -26,14 +26,15 @@ def acquire(func):
 
 class Client(object):
 
-    def __init__(self, servers=["localhost:11211"], debug=0, **kwargs):
-        self.debug = debug
-        self.io_loop = kwargs.get('loop') or tornado.ioloop.IOLoop.instance()
+    def __init__(self, **kwargs):
+        self.debug = kwargs.get('debug')
+        self.io_loop = kwargs.get('loop', tornado.ioloop.IOLoop.instance())
         self.pool = ConnectionPool(
-            servers,
-            debug=debug,
+            kwargs.get('servers', ["localhost:11211"]),
+            debug=self.debug,
             loop=self.io_loop,
-            **kwargs
+            minsize=kwargs.get('pool_minsize', 1),
+            maxsize=kwargs.get('pool_size', 15)
         )
 
     # key supports ascii sans space and control chars
