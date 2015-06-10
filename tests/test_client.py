@@ -1,5 +1,4 @@
 from time import sleep
-import logging
 from collections import defaultdict
 
 from asyncmc.client import Client
@@ -28,18 +27,18 @@ class ConnectionCommandsTest(BaseTest):
 
     @run_until_complete
     def test_set_typed(self):
-        value = {
+        init_val = {
             b'array': [],
             b'dict': {'a': 'b'},
             b'init': 12313,
             b'boolean': False,
             b'custom_type': set([1, 4, 4])
         }
-        yield [self.mcache.set(key, value) for key, value in value.items()]
+        yield [self.mcache.set(key, value) for key, value in init_val.items()]
         values = yield dict([
-            (key, self.mcache.get(key)) for key, value in value.items()
+            (key, self.mcache.get(key)) for key, value in init_val.items()
         ])
-        for key, val in value.items():
+        for key, val in init_val.items():
             self.assertEqual(val, values[key])
 
     @run_until_complete
@@ -48,12 +47,21 @@ class ConnectionCommandsTest(BaseTest):
         yield self.mcache.set(key, value)
         # make sure value exists
         test_value = yield self.mcache.get(key)
-        logging.info(test_value)
         self.assertEqual(test_value, value)
         # flush data
         yield self.mcache.flush_all()
         # make sure value does not exists
         test_value = yield self.mcache.get(key)
+
+    @run_until_complete
+    def test_set_expire(self):
+        key, value = b'key:set', b'1'
+        yield self.mcache.set(key, value, exptime=1)
+        test_value = yield self.mcache.get(key)
+        self.assertEqual(test_value, value)
+        sleep(2)
+        test_value = yield self.mcache.get(key)
+        self.assertEqual(test_value, None)
         self.assertEqual(test_value, None)
 
     @run_until_complete
@@ -63,6 +71,21 @@ class ConnectionCommandsTest(BaseTest):
         test_value = yield self.mcache.get(key)
         self.assertEqual(test_value, value)
         test_value = yield self.mcache.get(b'not:' + key)
+
+    @run_until_complete
+    def test_delete(self):
+        key, value = b'key:delete', b'value'
+        yield self.mcache.set(key, value)
+
+        # make sure value exists
+        test_value = yield self.mcache.get(key)
+        self.assertEqual(test_value, value)
+
+        is_deleted = yield self.mcache.delete(key)
+        self.assertTrue(is_deleted)
+        # make sure value does not exists
+        test_value = yield self.mcache.get(key)
+        self.assertEqual(test_value, None)
         self.assertEqual(test_value, None)
 
     @run_until_complete

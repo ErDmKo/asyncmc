@@ -186,14 +186,14 @@ class Client(object):
 
                 if flags == 0:
                     pass
+                elif flags & const.FLAG_BOOLEAN:
+                    val = bool(int(val))
                 elif flags & const.FLAG_INTEGER:
                     val = int(val)
                 elif flags & const.FLAG_JSON:
                     val = json.loads(val.decode('utf-8'))
                 elif flags & const.FLAG_PICKLE:
                     val = pickle.loads(val)
-                elif flags & const.FLAG_BOOLEAN:
-                    val = bool(int(val))
                 else:
                     val = False
 
@@ -212,6 +212,24 @@ class Client(object):
             raise ClientException('received too many responses')
         res = [received.get(k, None) for k in keys]
         raise gen.Return(res)
+
+    @acquire
+    @gen.coroutine
+    def delete(self, conn, key):
+        """Deletes a key/value pair from the server.
+
+        :param key: is the key to delete.
+        :return: True if case values was deleted or False to indicate
+        that the item with this key was not found.
+        """
+        assert self._validate_key(key)
+
+        command = b'delete ' + key
+        response = yield conn.send_cmd(command)
+
+        if response not in (const.DELETED, const.NOT_FOUND):
+            raise ClientException('Memcached delete failed', response)
+        raise gen.Return(response == const.DELETED)
 
     @gen.coroutine
     def _storage_command(self, conn, command, key, value,
