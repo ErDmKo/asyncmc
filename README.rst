@@ -1,5 +1,5 @@
 Asyncmc  
-.. image::https://travis-ci.org/ErDmKo/asyncmc.svg?branch=master
+.. image:: https://travis-ci.org/ErDmKo/asyncmc.svg?branch=master
 ====================
 
 
