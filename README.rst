@@ -1,4 +1,5 @@
-Asyncmc  image::https://travis-ci.org/ErDmKo/asyncmc.svg?branch=master
+Asyncmc  
+.. image::https://travis-ci.org/ErDmKo/asyncmc.svg?branch=master
 ====================
 
 
