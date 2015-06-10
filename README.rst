@@ -18,7 +18,7 @@ Quick links
 Hello, Memcached
 ==============
 
-Here is a simple "Hello, Session" example web app for Tornado with Torndsession.::
+Here is a simple "Hello, Memcached" example for Tornado with Memcached.::
 
 
     import tornado.ioloop
