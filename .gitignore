@@ -8,3 +8,8 @@ __py*
 *.egg
 *.tar.gz
 *.so
+build
+eggs
+.coverage
+*~
+dist
