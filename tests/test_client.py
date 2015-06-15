@@ -1,5 +1,4 @@
 from time import sleep
-from collections import defaultdict
 
 from asyncmc.client import Client
 from ._testutil import BaseTest, run_until_complete
@@ -24,6 +23,73 @@ class ConnectionCommandsTest(BaseTest):
         version = yield self.mcache.version()
         stats = yield self.mcache.stats()
         self.assertEqual(version, stats[b'version'])
+
+    @run_until_complete
+    def test_replace(self):
+        key, value = b'key:replace', b'1'
+        yield self.mcache.set(key, value)
+
+        test_value = yield self.mcache.replace(key, b'2')
+        self.assertEqual(test_value, True)
+        # make sure value exists
+        test_value = yield self.mcache.get(key)
+        self.assertEqual(test_value, b'2')
+
+        test_value = yield self.mcache.replace(b'not:' + key, b'3')
+        self.assertEqual(test_value, False)
+        # make sure value exists
+        test_value = yield self.mcache.get(b'not:' + key)
+        self.assertEqual(test_value, None)
+
+    @run_until_complete
+    def test_append(self):
+        key, value = b'key:append', b'1'
+        yield self.mcache.set(key, value)
+
+        test_value = yield self.mcache.append(key, b'2')
+        self.assertEqual(test_value, True)
+
+        # make sure value exists
+        test_value = yield self.mcache.get(key)
+        self.assertEqual(test_value, b'12')
+
+        test_value = yield self.mcache.append(b'not:' + key, b'3')
+        self.assertEqual(test_value, False)
+        # make sure value exists
+        test_value = yield self.mcache.get(b'not:' + key)
+        self.assertEqual(test_value, None)
+
+    @run_until_complete
+    def test_prepend(self):
+        key, value = b'key:prepend', b'1'
+        yield self.mcache.set(key, value)
+
+        test_value = yield self.mcache.prepend(key, b'2')
+        self.assertEqual(test_value, True)
+
+        # make sure value exists
+        test_value = yield self.mcache.get(key)
+        self.assertEqual(test_value, b'21')
+
+        test_value = yield self.mcache.prepend(b'not:' + key, b'3')
+        self.assertEqual(test_value, False)
+        # make sure value exists
+        test_value = yield self.mcache.get(b'not:' + key)
+        self.assertEqual(test_value, None)
+
+    @run_until_complete
+    def test_add(self):
+        key, value = b'key:add', b'1'
+        yield self.mcache.set(key, value)
+
+        test_value = yield self.mcache.add(key, b'2')
+        self.assertEqual(test_value, False)
+
+        test_value = yield self.mcache.add(b'not:' + key, b'2')
+        self.assertEqual(test_value, True)
+
+        test_value = yield self.mcache.get(b'not:' + key)
+        self.assertEqual(test_value, b'2')
 
     @run_until_complete
     def test_set_typed(self):

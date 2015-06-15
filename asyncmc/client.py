@@ -3,6 +3,7 @@ import functools
 import pickle
 import json
 import re
+import logging
 from .pool import ConnectionPool
 from . import constants as const
 from .exceptions import ClientException, ValidationException
@@ -146,6 +147,7 @@ class Client(object):
                 value = json.dumps(value).encode('utf-8')
                 flag |= const.FLAG_JSON
             except Exception as e:
+                logging.info(e)
                 value = pickle.dumps(value, 2)
                 flag |= const.FLAG_PICKLE
 
@@ -212,6 +214,72 @@ class Client(object):
         if len(received) > len(keys):
             raise ClientException('received too many responses')
         res = [received.get(k, None) for k in keys]
+        raise gen.Return(res)
+
+    @acquire
+    @gen.coroutine
+    def replace(self, conn, key, value, exptime=0):
+        """Store this data, but only if the server *does*
+        already hold data for this key.
+
+        :param key: ``bytes``, is the key of the item.
+        :param value: ``bytes``,  data to store.
+        :param exptime: ``int`` is expiration time. If it's 0, the
+        item never expires.
+        :return: ``bool``, True in case of success.
+        """
+        flags = 0  # TODO: fix when exception removed
+        res = yield self._storage_command(
+            conn, b'replace', key, value, flags, exptime)
+        raise gen.Return(res)
+
+    @acquire
+    @gen.coroutine
+    def append(self, conn, key, value, exptime=0):
+        """Add data to an existing key after existing data
+
+        :param key: ``bytes``, is the key of the item.
+        :param value: ``bytes``,  data to store.
+        :param exptime: ``int`` is expiration time. If it's 0, the
+        item never expires.
+        :return: ``bool``, True in case of success.
+        """
+        flags = 0  # TODO: fix when exception removed
+        res = yield self._storage_command(
+            conn, b'append', key, value, flags, exptime)
+        raise gen.Return(res)
+
+    @acquire
+    @gen.coroutine
+    def prepend(self, conn, key, value, exptime=0):
+        """Add data to an existing key before existing data
+
+        :param key: ``bytes``, is the key of the item.
+        :param value: ``bytes``, data to store.
+        :param exptime: ``int`` is expiration time. If it's 0, the
+        item never expires.
+        :return: ``bool``, True in case of success.
+        """
+        flags = 0  # TODO: fix when exception removed
+        res = yield self._storage_command(
+            conn, b'prepend', key, value, flags, exptime)
+        raise gen.Return(res)
+
+    @acquire
+    @gen.coroutine
+    def add(self, conn, key, value, exptime=0):
+        """Store this data, but only if the server *doesn't* already
+        hold data for this key.
+
+        :param key: ``bytes``, is the key of the item.
+        :param value: ``bytes``,  data to store.
+        :param exptime: ``int`` is expiration time. If it's 0, the
+        item never expires.
+        :return: ``bool``, True in case of success.
+        """
+        flags = 0
+        res = yield self._storage_command(
+            conn, b'add', key, value, flags, exptime)
         raise gen.Return(res)
 
     @acquire
