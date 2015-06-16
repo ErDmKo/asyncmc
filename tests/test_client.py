@@ -28,12 +28,19 @@ class ConnectionCommandsTest(BaseTest):
     def test_replace(self):
         key, value = b'key:replace', b'1'
         yield self.mcache.set(key, value)
+        key1, value1 = 'key1:replace', '1'
+        yield self.mcache.set(key1, value1)
 
         test_value = yield self.mcache.replace(key, b'2')
         self.assertEqual(test_value, True)
         # make sure value exists
         test_value = yield self.mcache.get(key)
         self.assertEqual(test_value, b'2')
+
+        test_value = yield self.mcache.replace(key1, '2')
+        self.assertEqual(test_value, True)
+        test_value = yield self.mcache.get(key1)
+        self.assertEqual(test_value, '2')
 
         test_value = yield self.mcache.replace(b'not:' + key, b'3')
         self.assertEqual(test_value, False)
@@ -45,6 +52,36 @@ class ConnectionCommandsTest(BaseTest):
     def test_append(self):
         key, value = b'key:append', b'1'
         yield self.mcache.set(key, value)
+        values = [{
+            'val': 1,
+            'add': 2,
+            'res': 3
+        }, {
+            'val': '1',
+            'add': '2',
+            'res': '12'
+        }, {
+            'val': [1, 2],
+            'add': [3, 4],
+            'res': [1, 2, 3, 4]
+        }]
+        for index, val in enumerate(values):
+            val['key'] = 'key:append{}'.format(index)
+            yield self.mcache.set(val['key'], val['val'])
+
+        app_results = yield [
+            self.mcache.append(val['key'], val['add']) for val in values
+        ]
+
+        for res in app_results:
+            self.assertEqual(res, True)
+
+        app_results = yield [
+            self.mcache.get(val['key']) for val in values
+        ]
+
+        for index, res in enumerate(app_results):
+            self.assertEqual(res, values[index]['res'])
 
         test_value = yield self.mcache.append(key, b'2')
         self.assertEqual(test_value, True)
@@ -153,6 +190,21 @@ class ConnectionCommandsTest(BaseTest):
         test_value = yield self.mcache.get(key)
         self.assertEqual(test_value, None)
         self.assertEqual(test_value, None)
+
+    @run_until_complete
+    def test_str_get(self):
+        key1, value1 = 'key:multi_get:1', b'1'
+        key2, value2 = 'key:multi_get:2', b'2'
+        yield self.mcache.set(key1, value1)
+        yield self.mcache.set(key2, value2)
+        test_value = yield self.mcache.multi_get(key1, key2)
+        self.assertEqual(test_value, [value1, value2])
+
+        test_value = yield self.mcache.get(key1)
+        test_value = yield self.mcache.multi_get('not' + key1, key2)
+        self.assertEqual(test_value, [None, value2])
+        test_value = yield self.mcache.multi_get()
+        self.assertEqual(test_value, [])
 
     @run_until_complete
     def test_multi_get(self):

@@ -83,6 +83,48 @@ class Client(object):
         version, number = response.split()
         raise gen.Return(number)
 
+    def _key_type(self, key_list=[], key=None):
+        out_keys = []
+
+        if not key_list and key:
+            if not isinstance(key, bytes):
+                key = key.encode('utf-8')
+            return key
+
+        for key in key_list:
+            if not isinstance(key, bytes):
+                key = key.encode('utf-8')
+            out_keys.append(key)
+        return out_keys
+
+    def _value_type(self, value):
+        flag = 0
+        if isinstance(value, bytes):
+            pass
+        elif isinstance(value, str):
+            flag |= const.FLAG_STRING
+            value = value.encode('utf-8')
+        elif isinstance(value, bool):
+            flag |= const.FLAG_BOOLEAN
+            value = str(int(value)).encode('utf-8')
+        elif isinstance(value, int):
+            flag |= const.FLAG_INTEGER
+            value = str(value).encode('utf-8')
+        else:
+            try:
+                value = json.dumps(value).encode('utf-8')
+                flag |= const.FLAG_JSON
+            except Exception as e:
+                logging.info(e)
+                value = pickle.dumps(value, 2)
+                flag |= const.FLAG_PICKLE
+
+        if not isinstance(value, bytes):
+            logging.info(value)
+            value = bytes(value)
+
+        return value, flag
+
     @acquire
     @gen.coroutine
     def multi_get(self, conn, *keys):
@@ -93,7 +135,7 @@ class Client(object):
         :raises:``ValidationException``, ``ClientException``,
         and socket errors
         """
-        result = yield self._multi_get(conn, *keys)
+        result = yield self._multi_get(conn, *self._key_type(key_list=keys))
         raise gen.Return(result)
 
     @acquire
@@ -115,7 +157,7 @@ class Client(object):
         :param default: default value if there is no value.
         :return: ``bytes``, is the data for this specified key.
         """
-        result = yield self._multi_get(conn, key)
+        result = yield self._multi_get(conn, self._key_type(key=key))
         result = result[0] if result else default
         raise gen.Return(result)
 
@@ -131,31 +173,9 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
-        flag = 0
-        if isinstance(value, str):
-            pass
-        elif isinstance(value, bytes):
-            pass
-        elif isinstance(value, bool):
-            flag |= const.FLAG_BOOLEAN
-            value = str(int(value)).encode('utf-8')
-        elif isinstance(value, int):
-            flag |= const.FLAG_INTEGER
-            value = str(value).encode('utf-8')
-        else:
-            try:
-                value = json.dumps(value).encode('utf-8')
-                flag |= const.FLAG_JSON
-            except Exception as e:
-                logging.info(e)
-                value = pickle.dumps(value, 2)
-                flag |= const.FLAG_PICKLE
-
-        if not isinstance(value, bytes):
-            value = bytes(value)
 
         resp = yield self._storage_command(
-            conn, b'set', key, value, flag, exptime)
+            conn, b'set', self._key_type(key=key), value, exptime)
         raise gen.Return(resp)
 
     @gen.coroutine
@@ -189,6 +209,8 @@ class Client(object):
 
                 if flags == 0:
                     pass
+                elif flags & const.FLAG_STRING:
+                    val = val.decode('utf-8')
                 elif flags & const.FLAG_BOOLEAN:
                     val = bool(int(val))
                 elif flags & const.FLAG_INTEGER:
@@ -228,9 +250,8 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
-        flags = 0  # TODO: fix when exception removed
         res = yield self._storage_command(
-            conn, b'replace', key, value, flags, exptime)
+            conn, b'replace', self._key_type(key=key), value, exptime)
         raise gen.Return(res)
 
     @acquire
@@ -244,9 +265,15 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
-        flags = 0  # TODO: fix when exception removed
+        if isinstance(value, bytes) or isinstance(value, str):
+            command = b'append'
+        else:
+            command = b'set'
+            old_val = yield self.get(key)
+            value = old_val + value
+
         res = yield self._storage_command(
-            conn, b'append', key, value, flags, exptime)
+            conn, command, self._key_type(key=key), value, exptime)
         raise gen.Return(res)
 
     @acquire
@@ -260,9 +287,8 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
-        flags = 0  # TODO: fix when exception removed
         res = yield self._storage_command(
-            conn, b'prepend', key, value, flags, exptime)
+            conn, b'prepend', key, value, exptime)
         raise gen.Return(res)
 
     @acquire
@@ -277,9 +303,8 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
-        flags = 0
         res = yield self._storage_command(
-            conn, b'add', key, value, flags, exptime)
+            conn, b'add', key, value, exptime)
         raise gen.Return(res)
 
     @acquire
@@ -302,7 +327,7 @@ class Client(object):
 
     @gen.coroutine
     def _storage_command(self, conn, command, key, value,
-                         flags=0, exptime=0):
+                         exptime=0):
         # req  - set <key> <flags> <exptime> <bytes> [noreply]\r\n
         #        <data block>\r\n
         # resp - STORED\r\n (or others)
@@ -318,6 +343,8 @@ class Client(object):
             raise ValidationException('exptime not int', exptime)
         elif exptime < 0:
             raise ValidationException('exptime negative', exptime)
+
+        value, flags = self._value_type(value)
 
         args = [str(a).encode('utf-8') for a in (flags, exptime, len(value))]
         _cmd = b' '.join([command, key] + args) + b'\r\n'
