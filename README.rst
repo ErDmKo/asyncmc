@@ -1,13 +1,13 @@
 Asyncmc  
-====================
+========
 
 .. image:: https://travis-ci.org/ErDmKo/asyncmc.svg?branch=master
 
-`Asyncmc <https://github.com/ErDmKo/asyncmc>`_ is a memcached client for `Tornado <https://github.com/tornadoweb/tornado>`__ web framework.
+`Asyncmc <https://github.com/ErDmKo/asyncmc>`_ is a memcached client for `Tornado <https://github.com/tornadoweb/tornado>`_ web framework.
 Asyncmc work with python 2.7 and python 3
 
 Quick links
-===========
+------------
   
 * `Source (github) <https://github.com/ErDmKo/asyncmc>`_
   
@@ -17,7 +17,8 @@ Quick links
 
 
 Hello, Memcached
-==============
+-----------------
+
 
 Here is a simple "Hello, Memcached" example for Tornado with Memcached.::
 
@@ -41,13 +42,23 @@ Here is a simple "Hello, Memcached" example for Tornado with Memcached.::
     loop.run_sync(out)
 
 Requires
-========
+---------
 
 
-+ `Tornado <https://github.com/tornadoweb/tornado>`__
++ `Tornado <https://github.com/tornadoweb/tornado>`_
 + `Memcached <http://memcached.org/>`_
  
+Installation
+-------------
+
+
+To install asyncmc, simply:
+
+.. code-block:: bash
+
+    $ pip install asyncmc
 
 LICENSE
-=======
+--------
+
 Asyncmc is licensed under MIT.

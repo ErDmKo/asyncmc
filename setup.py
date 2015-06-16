@@ -2,15 +2,20 @@ import os
 import sys
 from setuptools import setup, find_packages
 
-version = '0.2'
+version = '0.2.2'
 
 def read(f):
     return open(os.path.join(os.path.dirname(__file__), f)).read().strip()
 
+install_requires = [
+    'tornado>=4.1',
+    'toro>=0.8'
+]
+
 setup(name='asyncmc',
       version=version,
       description=('Minimal pure python tornado memcached client'),
-      long_description='\n\n'.join((read('README.rst'), read('CHANGES.txt'))),
+      long_description='\n\n'.join((read('README.rst'), read('CHANGES.rst'))),
       classifiers=[
           'License :: OSI Approved :: MIT License',
           'Development Status :: 3 - Alpha',
@@ -27,5 +32,5 @@ setup(name='asyncmc',
       url='https://github.com/ErDmKo/asyncmc/',
       license='MIT',
       packages=find_packages(),
-      install_requires = ['tornado', 'toro'],
+      install_requires = install_requires,
       include_package_data = True)
