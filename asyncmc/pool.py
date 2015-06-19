@@ -120,6 +120,7 @@ class Host(object):
         try:
             s.connect((self.host, self.port))
         except socket.error as msg:
+            logging.error(msg)
             print(msg)
             return None
         self.sock = s

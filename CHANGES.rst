@@ -1,6 +1,11 @@
 CHANGES
 ========
 
+0.4 (19-06-2015)
+----------------
+
+- New features keys may be "str" typed and extension method "prepend" is "+" on python
+
 0.3 (16-06-2015)
 ----------------
 

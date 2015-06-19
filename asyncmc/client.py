@@ -287,8 +287,16 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
+
+        if isinstance(value, bytes) or isinstance(value, str):
+            command = b'prepend'
+        else:
+            command = b'set'
+            old_val = yield self.get(key)
+            value = value + old_val
+
         res = yield self._storage_command(
-            conn, b'prepend', key, value, exptime)
+            conn, command, self._key_type(key=key), value, exptime)
         raise gen.Return(res)
 
     @acquire
@@ -304,7 +312,7 @@ class Client(object):
         :return: ``bool``, True in case of success.
         """
         res = yield self._storage_command(
-            conn, b'add', key, value, exptime)
+            conn, b'add', self._key_type(key=key), value, exptime)
         raise gen.Return(res)
 
     @acquire
@@ -316,6 +324,7 @@ class Client(object):
         :return: True if case values was deleted or False to indicate
         that the item with this key was not found.
         """
+        key = self._key_type(key=key)
         assert self._validate_key(key)
 
         command = b'delete ' + key
