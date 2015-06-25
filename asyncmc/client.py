@@ -330,7 +330,6 @@ class Client(object):
         assert self._validate_key(key)
 
         command = b'delete ' + key + (b' noreply' if noreply else b'')
-        logging.info(command)
         response = yield conn.send_cmd(command, noreply)
 
         if not noreply and response not in (const.DELETED, const.NOT_FOUND):
