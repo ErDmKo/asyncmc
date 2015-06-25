@@ -239,7 +239,7 @@ class Client(object):
 
     @acquire
     @gen.coroutine
-    def replace(self, conn, key, value, exptime=0):
+    def replace(self, conn, key, value, exptime=0, noreply=False):
         """Store this data, but only if the server *does*
         already hold data for this key.
 
@@ -250,12 +250,12 @@ class Client(object):
         :return: ``bool``, True in case of success.
         """
         res = yield self._storage_command(
-            conn, b'replace', self._key_type(key=key), value, exptime)
+            conn, b'replace', self._key_type(key=key), value, exptime, noreply)
         raise gen.Return(res)
 
     @acquire
     @gen.coroutine
-    def append(self, conn, key, value, exptime=0):
+    def append(self, conn, key, value, exptime=0, noreply=False):
         """Add data to an existing key after existing data
 
         :param key: ``bytes``, is the key of the item.
@@ -272,12 +272,12 @@ class Client(object):
             value = old_val + value
 
         res = yield self._storage_command(
-            conn, command, self._key_type(key=key), value, exptime)
+            conn, command, self._key_type(key=key), value, exptime, noreply)
         raise gen.Return(res)
 
     @acquire
     @gen.coroutine
-    def prepend(self, conn, key, value, exptime=0):
+    def prepend(self, conn, key, value, exptime=0, noreply=False):
         """Add data to an existing key before existing data
 
         :param key: ``bytes``, is the key of the item.
@@ -295,12 +295,12 @@ class Client(object):
             value = value + old_val
 
         res = yield self._storage_command(
-            conn, command, self._key_type(key=key), value, exptime)
+            conn, command, self._key_type(key=key), value, exptime, noreply)
         raise gen.Return(res)
 
     @acquire
     @gen.coroutine
-    def add(self, conn, key, value, exptime=0):
+    def add(self, conn, key, value, exptime=0, noreply=False):
         """Store this data, but only if the server *doesn't* already
         hold data for this key.
 
@@ -310,13 +310,16 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
+        if noreply:
+            logging.warning('Call add method with noreply tag')
+
         res = yield self._storage_command(
-            conn, b'add', self._key_type(key=key), value, exptime)
+            conn, b'add', self._key_type(key=key), value, exptime, noreply)
         raise gen.Return(res)
 
     @acquire
     @gen.coroutine
-    def delete(self, conn, key):
+    def delete(self, conn, key, noreply=False):
         """Deletes a key/value pair from the server.
 
         :param key: is the key to delete.
@@ -326,12 +329,13 @@ class Client(object):
         key = self._key_type(key=key)
         assert self._validate_key(key)
 
-        command = b'delete ' + key
-        response = yield conn.send_cmd(command)
+        command = b'delete ' + key + (b' noreply' if noreply else b'')
+        logging.info(command)
+        response = yield conn.send_cmd(command, noreply)
 
-        if response not in (const.DELETED, const.NOT_FOUND):
+        if not noreply and response not in (const.DELETED, const.NOT_FOUND):
             raise ClientException('Memcached delete failed', response)
-        raise gen.Return(response == const.DELETED)
+        raise gen.Return(response == const.DELETED or noreply)
 
     @gen.coroutine
     def _storage_command(self, conn, command, key, value,
@@ -360,7 +364,6 @@ class Client(object):
         args = [str(a).encode('utf-8') for a in args_arr]
         _cmd = b' '.join([command, key] + args) + b'\r\n'
         cmd = _cmd + value
-        logging.info(cmd)
 
         resp = yield conn.send_cmd(cmd, noreply=noreply)
 

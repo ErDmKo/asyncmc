@@ -44,7 +44,7 @@ class Host(object):
     def send_cmd(self, cmd, noreply=False):
         self._ensure_connection()
         cmd = cmd + "\r\n".encode()
-        self.stream.write(cmd)
+        yield self.stream.write(cmd)
         if not noreply:
             response = yield self.stream.read_until(b'\r\n')
             raise gen.Return(response[:-2])

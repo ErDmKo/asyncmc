@@ -48,23 +48,34 @@ class ConnectionCommandsTest(BaseTest):
     def test_replace(self):
         key, value = b'key:replace', b'1'
         yield self.mcache.set(key, value)
-        key1, value1 = 'key1:replace', '1'
-        yield self.mcache.set(key1, value1)
+
+        key_str, value_str = 'key1:replace', '1'
+        yield self.mcache.set(key_str, value_str)
+
+        key_noreply, value_noreply = 'key2:replace', '1'
+        yield self.mcache.set(key_noreply, value_noreply)
+
+        test_value = yield self.mcache.replace(key_noreply, '2', noreply=True)
+        self.assertEqual(test_value, True)
 
         test_value = yield self.mcache.replace(key, b'2')
         self.assertEqual(test_value, True)
-        # make sure value exists
+
         test_value = yield self.mcache.get(key)
         self.assertEqual(test_value, b'2')
 
-        test_value = yield self.mcache.replace(key1, '2')
+        test_value = yield self.mcache.replace(key_str, '2')
         self.assertEqual(test_value, True)
-        test_value = yield self.mcache.get(key1)
+
+        test_value = yield self.mcache.get(key_str)
+        self.assertEqual(test_value, '2')
+
+        test_value = yield self.mcache.get(key_noreply)
         self.assertEqual(test_value, '2')
 
         test_value = yield self.mcache.replace(b'not:' + key, b'3')
         self.assertEqual(test_value, False)
-        # make sure value exists
+
         test_value = yield self.mcache.get(b'not:' + key)
         self.assertEqual(test_value, None)
 
@@ -75,15 +86,18 @@ class ConnectionCommandsTest(BaseTest):
         values = [{
             'val': 1,
             'add': 2,
-            'res': 3
+            'res': 3,
+            'res1': 5
         }, {
             'val': '1',
             'add': '2',
-            'res': '12'
+            'res': '12',
+            'res1': '122'
         }, {
             'val': [1, 2],
             'add': [3, 4],
-            'res': [1, 2, 3, 4]
+            'res': [1, 2, 3, 4],
+            'res1': [1, 2, 3, 4, 3, 4]
         }]
         for index, val in enumerate(values):
             val['key'] = 'key:append{}'.format(index)
@@ -99,6 +113,17 @@ class ConnectionCommandsTest(BaseTest):
         app_results = yield [
             self.mcache.get(val['key']) for val in values
         ]
+
+        no_rep_app_results = yield [
+            self.mcache.append(
+                val['key'],
+                val['add'],
+                noreply=True
+            ) for val in values
+        ]
+
+        for res in no_rep_app_results:
+            self.assertEqual(res, True)
 
         for index, res in enumerate(app_results):
             self.assertEqual(res, values[index]['res'])
@@ -116,6 +141,13 @@ class ConnectionCommandsTest(BaseTest):
         test_value = yield self.mcache.get(b'not:' + key)
         self.assertEqual(test_value, None)
 
+        app_results = yield [
+            self.mcache.get(val['key']) for val in values
+        ]
+
+        for index, res in enumerate(app_results):
+            self.assertEqual(res, values[index]['res1'])
+
     @run_until_complete
     def test_prepend(self):
         key, value = b'key:prepend', b'1'
@@ -124,15 +156,18 @@ class ConnectionCommandsTest(BaseTest):
         values = [{
             'val': 1,
             'add': 2,
-            'res': 3
+            'res': 3,
+            'res1': 5
         }, {
             'val': '1',
             'add': '2',
-            'res': '21'
+            'res': '21',
+            'res1': '221'
         }, {
             'val': [1, 2],
             'add': [3, 4],
-            'res': [3, 4, 1, 2]
+            'res': [3, 4, 1, 2],
+            'res1': [3, 4, 3, 4, 1, 2]
         }]
         for index, val in enumerate(values):
             val['key'] = 'key:prepend{}'.format(index)
@@ -151,6 +186,18 @@ class ConnectionCommandsTest(BaseTest):
 
         for index, res in enumerate(app_results):
             self.assertEqual(res, values[index]['res'])
+
+        no_rep_app_results = yield [
+            self.mcache.prepend(
+                val['key'],
+                val['add'],
+                noreply=True
+            ) for val in values
+        ]
+
+        for res in no_rep_app_results:
+            self.assertEqual(res, True)
+
         test_value = yield self.mcache.prepend(key, b'2')
         self.assertEqual(test_value, True)
 
@@ -164,27 +211,38 @@ class ConnectionCommandsTest(BaseTest):
         test_value = yield self.mcache.get(b'not:' + key)
         self.assertEqual(test_value, None)
 
+        app_results = yield [
+            self.mcache.get(val['key']) for val in values
+        ]
+
+        for index, res in enumerate(app_results):
+            self.assertEqual(res, values[index]['res1'])
+
     @run_until_complete
     def test_add(self):
         key, value = b'key:add', b'1'
         yield self.mcache.set(key, value)
 
-        key1, value1 = 'key:add_str', '1'
-        yield self.mcache.set(key1, value1)
+        key_str, value_str = 'key:add_str', '1'
+        yield self.mcache.set(key_str, value_str)
+
+        key_noreply, value_noreply = 'key:add_noreply', '1'
+        yield self.mcache.set(key_noreply, value_noreply, noreply=True)
 
         test_value = yield self.mcache.add(key, b'2')
         self.assertEqual(test_value, False)
 
-        test_value = yield self.mcache.add(key1, b'2')
+        test_value = yield self.mcache.add(key_str, b'2')
         self.assertEqual(test_value, False)
 
-        test_value = yield self.mcache.add(key1, b'2')
-        self.assertEqual(test_value, False)
-
-        test_value = yield self.mcache.add('not:' + key1, '2')
+        test_value = yield self.mcache.add(key_noreply, b'2', noreply=True)
+        # no sense here
         self.assertEqual(test_value, True)
 
-        test_value = yield self.mcache.get('not:' + key1)
+        test_value = yield self.mcache.add('not:' + key_str, '2')
+        self.assertEqual(test_value, True)
+
+        test_value = yield self.mcache.get('not:' + key_str)
         self.assertEqual(test_value, '2')
 
         test_value = yield self.mcache.add(b'not:' + key, b'2')
@@ -274,30 +332,31 @@ class ConnectionCommandsTest(BaseTest):
     @run_until_complete
     def test_delete(self):
         key, value = b'key:delete', b'value'
-        yield self.mcache.set(key, value)
+        yield self.check_setget(key, value)
 
-        key1, value1 = 'key:delete1', 'value_str'
-        yield self.mcache.set(key1, value1)
+        key_noreply, value_noreply = 'key:delete2', 'value_str'
+        yield self.check_setget(key_noreply, value_noreply)
 
-        # make sure value exists
-        test_value = yield self.mcache.get(key)
-        self.assertEqual(test_value, value)
-
-        # make sure value exists
-        test_value = yield self.mcache.get(key1)
-        self.assertEqual(test_value, value1)
+        key_str, value_str = 'key:delete1', 'value_str'
+        yield self.check_setget(key_str, value_str)
 
         is_deleted = yield self.mcache.delete(key)
         self.assertTrue(is_deleted)
 
-        is_deleted = yield self.mcache.delete(key1)
+        is_deleted = yield self.mcache.delete(key_str)
+        self.assertTrue(is_deleted)
+
+        is_deleted = yield self.mcache.delete(key_noreply, noreply=True)
         self.assertTrue(is_deleted)
 
         # make sure value does not exists
         test_value = yield self.mcache.get(key)
         self.assertEqual(test_value, None)
 
-        test_value = yield self.mcache.get(key1)
+        test_value = yield self.mcache.get(key_str)
+        self.assertEqual(test_value, None)
+
+        test_value = yield self.mcache.get(key_noreply)
         self.assertEqual(test_value, None)
 
     @run_until_complete
