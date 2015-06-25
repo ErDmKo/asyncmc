@@ -1,6 +1,15 @@
 CHANGES
 ========
 
+0.5 (25-06-2015)
+----------------
+
+- add support for noreply
+
+the memcache protocol defines a 'noreply' optional parameter, which
+instructs the server to not send a reply. In heavy usage environments
+this can lead to significant performance improvements.
+
 0.4 (19-06-2015)
 ----------------
 
