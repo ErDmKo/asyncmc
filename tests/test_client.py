@@ -1,7 +1,22 @@
 from time import sleep
+from tornado import gen
 
 from asyncmc.client import Client
 from ._testutil import BaseTest, run_until_complete
+
+
+class FooStruct(object):
+
+    def __init__(self):
+        self.bar = "baz"
+
+    def __str__(self):
+        return "A FooStruct"
+
+    def __eq__(self, other):
+        if isinstance(other, FooStruct):
+            return self.bar == other.bar
+        return 0
 
 
 class ConnectionCommandsTest(BaseTest):
@@ -16,7 +31,12 @@ class ConnectionCommandsTest(BaseTest):
     @run_until_complete
     def test_utils(self):
         sleep(1)
-        self.assertEqual(0, 0)
+
+    @gen.coroutine
+    def check_setget(self, key, val, noreply=False):
+        yield self.mcache.set(key, val, noreply=noreply)
+        newval = yield self.mcache.get(key)
+        self.assertEqual(newval, val)
 
     @run_until_complete
     def test_version(self):
@@ -181,7 +201,8 @@ class ConnectionCommandsTest(BaseTest):
             b'init': 12313,
             'init_str': 12313,
             b'boolean': False,
-            b'custom_type': set([1, 4, 4])
+            b'custom_type': set([1, 4, 4]),
+            b'custom_type1': FooStruct()
         }
 
         results = yield [
@@ -228,6 +249,27 @@ class ConnectionCommandsTest(BaseTest):
         test_value = yield self.mcache.get(key)
         self.assertEqual(test_value, value)
         test_value = yield self.mcache.get(b'not:' + key)
+        self.assertEqual(test_value, None)
+        yield [
+            self.check_setget(
+                "a_string",
+                "some random string"
+            ),
+            self.check_setget(
+                "a_string_2",
+                "some random string",
+                noreply=True
+            ),
+            self.check_setget(
+                "an_integer",
+                42
+            ),
+            self.check_setget(
+                "an_integer_2",
+                42,
+                noreply=True
+            )
+        ]
 
     @run_until_complete
     def test_delete(self):

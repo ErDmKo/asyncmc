@@ -163,7 +163,7 @@ class Client(object):
 
     @acquire
     @gen.coroutine
-    def set(self, conn, key, value, exptime=0):
+    def set(self, conn, key, value, exptime=0, noreply=False):
         """Sets a key to a value on the server
         with an optional exptime (0 means don't auto-expire)
 
@@ -173,9 +173,8 @@ class Client(object):
         item never expires.
         :return: ``bool``, True in case of success.
         """
-
         resp = yield self._storage_command(
-            conn, b'set', self._key_type(key=key), value, exptime)
+            conn, b'set', self._key_type(key=key), value, exptime, noreply)
         raise gen.Return(resp)
 
     @gen.coroutine
@@ -336,7 +335,7 @@ class Client(object):
 
     @gen.coroutine
     def _storage_command(self, conn, command, key, value,
-                         exptime=0):
+                         exptime=0, noreply=False):
         # req  - set <key> <flags> <exptime> <bytes> [noreply]\r\n
         #        <data block>\r\n
         # resp - STORED\r\n (or others)
@@ -348,21 +347,26 @@ class Client(object):
 
         assert self._validate_key(key)
 
-        if not isinstance(exptime, int):
+        if not isinstance(exptime, int) or isinstance(exptime, bool):
             raise ValidationException('exptime not int', exptime)
         elif exptime < 0:
             raise ValidationException('exptime negative', exptime)
 
         value, flags = self._value_type(value)
 
-        args = [str(a).encode('utf-8') for a in (flags, exptime, len(value))]
+        args_arr = [flags, exptime, len(value)]
+        if noreply:
+            args_arr.append('noreply')
+        args = [str(a).encode('utf-8') for a in args_arr]
         _cmd = b' '.join([command, key] + args) + b'\r\n'
         cmd = _cmd + value
-        resp = yield conn.send_cmd(cmd)
+        logging.info(cmd)
 
-        if resp not in (const.STORED, const.NOT_STORED):
-            raise ClientException('stats {} failed'.format(command), resp)
-        raise gen.Return(resp == const.STORED)
+        resp = yield conn.send_cmd(cmd, noreply=noreply)
+
+        if not noreply and resp not in (const.STORED, const.NOT_STORED):
+            raise ClientException('stats "{}" failed'.format(cmd), resp)
+        raise gen.Return(resp == const.STORED or noreply)
 
     def _validate_key(self, key):
         if not isinstance(key, bytes):  # avoid bugs subtle and otherwise

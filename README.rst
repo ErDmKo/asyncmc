@@ -13,8 +13,7 @@ Quick links
   
 * `License <https://raw.githubusercontent.com/ErDmKo/asyncmc/master/LICENSE.txt>`_
   
-* `Examples <https://github.com/ErDmKo/asyncmc/tree/master/exapmles>`_
-
+* `Examples <https://github.com/ErDmKo/asyncmc/blob/master/examples>`_
 
 Hello, Memcached
 -----------------
