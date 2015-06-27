@@ -2,6 +2,7 @@ from time import sleep
 from tornado import gen
 
 from asyncmc.client import Client
+from asyncmc.exceptions import ClientException, ValidationException
 from ._testutil import BaseTest, run_until_complete
 
 
@@ -299,6 +300,21 @@ class ConnectionCommandsTest(BaseTest):
         test_value = yield self.mcache.get(key)
         self.assertEqual(test_value, None)
         self.assertEqual(test_value, None)
+
+    @run_until_complete
+    def test_exeptions(self):
+        f = False
+        try:
+            yield self.mcache.set('ва', 'sdfadsf')
+        except ValidationException:
+            f = True
+        self.assertEqual(f, True)
+        f = False
+        try:
+            yield self.mcache.multi_get('ecxeption', 'ecxeption')
+        except ClientException:
+            f = True
+        self.assertEqual(f, True)
 
     @run_until_complete
     def test_set_get(self):

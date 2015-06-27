@@ -1,6 +1,7 @@
 __py*
 .env27
 .env
+.coverage
 *.egg-info
 *.pyc
 *.pyo

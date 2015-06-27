@@ -9,6 +9,48 @@ from . import constants as const
 from .exceptions import ClientException, ValidationException
 from tornado import gen
 
+"""client module for memcached (memory cache daemon)
+
+Overview
+========
+
+See U{the MemCached homepage<http://www.danga.com/memcached>} for more
+about memcached.
+
+Usage summary
+=============
+
+This should give you a feel for how this module operates::
+
+    @gen.coroutine
+    def out():
+        mc = asyncmc.Client(servers=['localhost:11211'], loop=i_loop)
+        yield mc.set(b"some_key", b"Some value")
+        value = yield mc.get(b"some_key")
+        print(value)
+        values = yield mc.multi_get(b"some_key", b"other_key")
+        print(values)
+        yield mc.delete(b"another_key")
+
+    i_loop.run_sync(out)
+
+The standard way to use memcache with a database is like this:
+
+    obj = yield mc.get(key)
+    if not obj:
+        obj = backend_api.get(...)
+        yield mc.set(key, obj)
+
+    # we now have obj, and future passes through this code
+    # will use the object from the cache.
+
+Detailed Documentation
+======================
+
+More detailed documentation is available in the L{Client} class.
+
+"""
+
 
 def acquire(func):
 
@@ -26,6 +68,17 @@ def acquire(func):
 
 
 class Client(object):
+    """Object representing a memcache server.
+
+    See L{memcache} for an overview.
+    In any case key will be a simple hashable type (string, integer, etc.)
+
+
+    @group Insertion: set, add, replace
+    @group Retrieval: get, get_multi
+    @group Removal: delete
+
+    """
 
     def __init__(self, **kwargs):
         self.debug = kwargs.get('debug')
@@ -38,6 +91,17 @@ class Client(object):
             maxsize=kwargs.get('pool_size', 15)
         )
 
+        """Create a new Client object with the given list of servers.
+            @param servers: C{servers} is passed to L{set_servers}.
+            @param loop: Event loop which is used for ansync operations.
+                It is optional but if is not defined it will be tornado
+                singletone event loop instance.
+            @param pool_minsize: Minimal number of connetions with memcashed
+                server
+            @param pool_size: Maximal number of connetions with memcashed
+                server
+        """
+
     # key supports ascii sans space and control chars
     # \x21 is !, right after space, and \x7e is -, right before DEL
     # also 1 <= len <= 250 as per the spec
@@ -46,7 +110,11 @@ class Client(object):
     @acquire
     @gen.coroutine
     def stats(self, conn, args=None):
-        """Runs a stats command on the server."""
+        """Runs a stats command on the server
+
+        @param args: Additional arguments to pass to the memcache
+            "stats" command.
+        """
         # req  - stats [additional args]\r\n
         # resp - STAT <name> <value>\r\n (one per result)
         #        END\r\n
@@ -74,7 +142,7 @@ class Client(object):
     def version(self, conn):
         """Current version of the server.
 
-        :return: ``bytes``, memcached version for current the server.
+        @return: bytes, memcached version for current the server.
         """
         command = b'version'
         response = yield conn.send_cmd(command)
@@ -128,12 +196,17 @@ class Client(object):
     @acquire
     @gen.coroutine
     def multi_get(self, conn, *keys):
-        """Takes a list of keys and returns a list of values.
+        """Retrieves multiple keys from the memcache doing just one query.
 
-        :param keys: ``list`` keys for the item being fetched.
-        :return: ``list`` of values for the specified keys.
-        :raises:``ValidationException``, ``ClientException``,
-        and socket errors
+        This method is recommended over regular L{get} as it lowers
+        the number of total packets flying around your network,
+        reducing total latency, since your app doesn't have to wait
+        for each round-trip of L{get} before sending the next one.
+
+        @param keys: list keys for the item being fetched.
+        @return: list of values for the specified keys.
+        @raises: ValidationException, ClientException,
+            and socket errors
         """
         result = yield self._multi_get(conn, *self._key_type(key_list=keys))
         raise gen.Return(result)
@@ -153,9 +226,10 @@ class Client(object):
     def get(self, conn, key, default=None):
         """Gets a single value from the server.
 
-        :param key: ``bytes``, is the key for the item being fetched
-        :param default: default value if there is no value.
-        :return: ``bytes``, is the data for this specified key.
+        @param key: bytes or string, is the key for the item being fetched
+        @param default: default value if there is no value.
+            #DOTO test default value
+        @return: custom type, is the data for this specified key.
         """
         result = yield self._multi_get(conn, self._key_type(key=key))
         result = result[0] if result else default
@@ -167,11 +241,17 @@ class Client(object):
         """Sets a key to a value on the server
         with an optional exptime (0 means don't auto-expire)
 
-        :param key: ``bytes``, is the key of the item.
-        :param value: ``bytes``, data to store.
-        :param exptime: ``int``, is expiration time. If it's 0, the
-        item never expires.
-        :return: ``bool``, True in case of success.
+        @param key: bytes or string, is the key of the item.
+        @param value: custom type, data to store.
+        @param exptime: Tells memcached the time which this value should
+            expire, either as a delta number of seconds, or an absolute
+            unix time-since-the-epoch value. See the memcached protocol
+            docs section "Storage Commands" for more info on <exptime>. We
+            default to 0 == cache forever.
+        @param noreply: optional parameter instructs the server to not
+        send the reply.
+
+        @return: bool, True in case of success.
         """
         resp = yield self._storage_command(
             conn, b'set', self._key_type(key=key), value, exptime, noreply)
@@ -241,13 +321,13 @@ class Client(object):
     @gen.coroutine
     def replace(self, conn, key, value, exptime=0, noreply=False):
         """Store this data, but only if the server *does*
-        already hold data for this key.
+            already hold data for this key.
 
-        :param key: ``bytes``, is the key of the item.
-        :param value: ``bytes``,  data to store.
-        :param exptime: ``int`` is expiration time. If it's 0, the
-        item never expires.
-        :return: ``bool``, True in case of success.
+        @param key: bytes or string, is the key of the item.
+        @param value: custom class,  data to store.
+        @param exptime: int is expiration time. If it's 0, the
+            item never expires.
+        @return: bool, True in case of success.
         """
         res = yield self._storage_command(
             conn, b'replace', self._key_type(key=key), value, exptime, noreply)
@@ -258,11 +338,13 @@ class Client(object):
     def append(self, conn, key, value, exptime=0, noreply=False):
         """Add data to an existing key after existing data
 
-        :param key: ``bytes``, is the key of the item.
-        :param value: ``bytes``,  data to store.
-        :param exptime: ``int`` is expiration time. If it's 0, the
-        item never expires.
-        :return: ``bool``, True in case of success.
+        Also see L{prepend}.
+
+        @param key: bytes or string, is the key of the item.
+        @param value: custom type, data to store.
+        @param exptime: int is expiration time. If it's 0, the
+            item never expires.
+        @return: bool, True in case of success.
         """
         if isinstance(value, bytes) or isinstance(value, str):
             command = b'append'
@@ -280,11 +362,11 @@ class Client(object):
     def prepend(self, conn, key, value, exptime=0, noreply=False):
         """Add data to an existing key before existing data
 
-        :param key: ``bytes``, is the key of the item.
-        :param value: ``bytes``, data to store.
-        :param exptime: ``int`` is expiration time. If it's 0, the
-        item never expires.
-        :return: ``bool``, True in case of success.
+        @param key: bytes or string, is the key of the item.
+        @param value: custom type, data to store.
+        @param exptime: int is expiration time. If it's 0, the
+            item never expires.
+        @return: bool, True in case of success.
         """
 
         if isinstance(value, bytes) or isinstance(value, str):
@@ -304,11 +386,13 @@ class Client(object):
         """Store this data, but only if the server *doesn't* already
         hold data for this key.
 
-        :param key: ``bytes``, is the key of the item.
-        :param value: ``bytes``,  data to store.
-        :param exptime: ``int`` is expiration time. If it's 0, the
-        item never expires.
-        :return: ``bool``, True in case of success.
+        @param noreply: optional parameter instructs the server to not send the
+            reply.
+
+        @param value: srings or bytes, data to store.
+        @param exptime: int is expiration time. If it's 0, the
+            item never expires.
+        @return: bool, True in case of success.
         """
         if noreply:
             logging.warning('Call add method with noreply tag')
@@ -322,9 +406,13 @@ class Client(object):
     def delete(self, conn, key, noreply=False):
         """Deletes a key/value pair from the server.
 
-        :param key: is the key to delete.
-        :return: True if case values was deleted or False to indicate
+        @return: Nonzero on success. True if case values was
+             deleted or False to indicate
         that the item with this key was not found.
+  .
+        @param noreply: optional parameter instructs the server to not send the
+            reply.
+
         """
         key = self._key_type(key=key)
         assert self._validate_key(key)

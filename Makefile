@@ -12,3 +12,6 @@ test27: pep flake
 
 test: pep flake
 	$(PYTHON) -m unittest discover -v $(FILTER)
+
+cov: pep flake
+	coverage run -m unittest discover && coverage report -m
