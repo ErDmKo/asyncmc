@@ -7,7 +7,7 @@ class ClientException(Exception):
     def __init__(self, msg, item=None):
         if item is not None:
             msg = '%s: %r' % (msg, item)
-        super().__init__(msg)
+        super(Exception, self).__init__(msg)
 
 
 class ValidationException(ClientException):

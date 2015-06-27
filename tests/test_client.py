@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 from time import sleep
 from tornado import gen
 
@@ -305,7 +306,7 @@ class ConnectionCommandsTest(BaseTest):
     def test_exeptions(self):
         f = False
         try:
-            yield self.mcache.set('ва', 'sdfadsf')
+            yield self.mcache.set(u'ва', 'sdfadsf')
         except ValidationException:
             f = True
         self.assertEqual(f, True)
