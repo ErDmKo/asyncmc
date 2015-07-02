@@ -1,11 +1,15 @@
 CHANGES
 ========
 
+0.6 (2-07-2015)
+----------------
+
+- New feature Multiply server connection
+
 0.5.1 (27-06-2015)
 ----------------
 
 - Documentation improve
-
 
 0.5 (25-06-2015)
 ----------------

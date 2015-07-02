@@ -4,10 +4,11 @@ import pickle
 import json
 import re
 import logging
-from .pool import ConnectionPool
+from tornado import gen
+
 from . import constants as const
 from .exceptions import ClientException, ValidationException
-from tornado import gen
+from .pool import ConnectionPool
 
 """client module for memcached (memory cache daemon)
 
@@ -165,6 +166,9 @@ class Client(object):
             out_keys.append(key)
         return out_keys
 
+    def close(self):
+        self.pool.clear()
+
     def _value_type(self, value):
         flag = 0
         if isinstance(value, bytes):
@@ -213,12 +217,12 @@ class Client(object):
 
     @acquire
     @gen.coroutine
-    def flush_all(self, conn):
+    def flush_all(self, conn, noreply=False):
         """Its effect is to invalidate all existing items immediately"""
-        command = b'flush_all'
-        response = yield conn.send_cmd(command)
+        command = b'flush_all' + (b' noreply' if noreply else b'')
+        response = yield conn.send_cmd_all(command)
 
-        if const.OK != response:
+        if [const.OK for n in range(len(response))] != response:
             raise ClientException('Memcached flush_all failed', response)
 
     @acquire
@@ -270,47 +274,46 @@ class Client(object):
         [self._validate_key(key) for key in keys]
         if len(set(keys)) != len(keys):
             raise ClientException('duplicate keys passed to multi_get')
-        stream = conn.get_stream('1')  # TODO more streams
-        cmd = b'get ' + b' '.join(keys) + b'\r\n'
-        yield stream.write(cmd)
+        cmd = b'get ' + b' '.join(keys)
+        servers_resp = yield conn.send_cmd_all(cmd, stream=True)
         received = {}
-        line = yield stream.read_until(b'\n')
-        while line != b'END\r\n':
-            terms = line.split()
-
-            if len(terms) == 4 and terms[0] == b'VALUE':  # exists
-                key = terms[1]
-                flags = int(terms[2])
-                length = int(terms[3])
-
-                val = yield stream.read_bytes(length+2)
-                val = val[:-2]
-
-                if flags == 0:
-                    pass
-                elif flags & const.FLAG_STRING:
-                    val = val.decode('utf-8')
-                elif flags & const.FLAG_BOOLEAN:
-                    val = bool(int(val))
-                elif flags & const.FLAG_INTEGER:
-                    val = int(val)
-                elif flags & const.FLAG_JSON:
-                    val = json.loads(val.decode('utf-8'))
-                elif flags & const.FLAG_PICKLE:
-                    val = pickle.loads(val)
-                else:
-                    val = False
-
-                if val is False and not flags & const.FLAG_BOOLEAN:
-                    raise ClientException('Unknown flag from server')
-                if key in received:
-                    raise ClientException('duplicate results from server')
-
-                received[key] = val
-            else:
-                raise ClientException('get failed', line)
-
+        for stream in servers_resp:
             line = yield stream.read_until(b'\n')
+            while line != b'END\r\n':
+                terms = line.split()
+
+                if len(terms) == 4 and terms[0] == b'VALUE':  # exists
+                    key = terms[1]
+                    flags = int(terms[2])
+                    length = int(terms[3])
+
+                    val = yield stream.read_bytes(length+2)
+                    val = val[:-2]
+
+                    if flags == 0:
+                        pass
+                    elif flags & const.FLAG_STRING:
+                        val = val.decode('utf-8')
+                    elif flags & const.FLAG_BOOLEAN:
+                        val = bool(int(val))
+                    elif flags & const.FLAG_INTEGER:
+                        val = int(val)
+                    elif flags & const.FLAG_JSON:
+                        val = json.loads(val.decode('utf-8'))
+                    elif flags & const.FLAG_PICKLE:
+                        val = pickle.loads(val)
+                    else:
+                        val = False
+
+                    if val is False and not flags & const.FLAG_BOOLEAN:
+                        raise ClientException('Unknown flag from server')
+                    if key in received:
+                        raise ClientException('duplicate results from servers')
+
+                    received[key] = val
+                else:
+                    raise ClientException('get{} failed'.format(cmd), line)
+                line = yield stream.read_until(b'\n')
 
         if len(received) > len(keys):
             raise ClientException('received too many responses')
@@ -368,7 +371,6 @@ class Client(object):
             item never expires.
         @return: bool, True in case of success.
         """
-
         if isinstance(value, bytes) or isinstance(value, str):
             command = b'prepend'
         else:
@@ -414,11 +416,13 @@ class Client(object):
             reply.
 
         """
+        server, key = conn._get_server(key)
+
         key = self._key_type(key=key)
         assert self._validate_key(key)
 
         command = b'delete ' + key + (b' noreply' if noreply else b'')
-        response = yield conn.send_cmd(command, noreply)
+        response = yield server.send_cmd(command, noreply)
 
         if not noreply and response not in (const.DELETED, const.NOT_FOUND):
             raise ClientException('Memcached delete failed', response)
@@ -435,6 +439,7 @@ class Client(object):
         #   SERVER_ERROR object too large for cache\r\n
         # however custom-compiled memcached can have different limit
         # so, we'll let the server decide what's too much
+        server, key = conn._get_server(key)
 
         assert self._validate_key(key)
 
@@ -451,8 +456,9 @@ class Client(object):
         args = [str(a).encode('utf-8') for a in args_arr]
         _cmd = b' '.join([command, key] + args) + b'\r\n'
         cmd = _cmd + value
+        server, key = conn._get_server(key)
 
-        resp = yield conn.send_cmd(cmd, noreply=noreply)
+        resp = yield server.send_cmd(cmd, noreply=noreply)
 
         if not noreply and resp not in (const.STORED, const.NOT_STORED):
             raise ClientException('stats "{}" failed'.format(cmd), resp)

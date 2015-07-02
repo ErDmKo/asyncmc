@@ -1,6 +1,6 @@
 from time import sleep
 from ._testutil import run_until_complete, BaseTest
-from asyncmc.pool import ConnectionPool, Connection, Host
+from asyncmc.pool import ConnectionPool, Connection
 
 
 class PoolTest(BaseTest):
@@ -20,7 +20,6 @@ class PoolTest(BaseTest):
         pool = ConnectionPool(['memcached:11211'], debug=1)
         conn = yield pool.acquire()
         self.assertIsInstance(conn, Connection)
-        self.assertIsInstance(conn.get_server_for_key('test'), Host)
         pool.release(conn)
 
     @run_until_complete

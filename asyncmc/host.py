@@ -41,10 +41,18 @@ class Host(object):
             self.sock = None
 
     @gen.coroutine
-    def send_cmd(self, cmd, noreply=False):
+    def send_cmd(self, cmd, noreply=False, stream=False):
         self._ensure_connection()
         cmd = cmd + "\r\n".encode()
-        yield self.stream.write(cmd)
+        '''
+        logging.info(cmd)
+        import pdb; pdb.set_trace()
+        '''
+        if stream:
+            yield self.stream.write(cmd)
+            raise gen.Return(self.stream)
+        else:
+            yield self.stream.write(cmd)
         if not noreply:
             response = yield self.stream.read_until(b'\r\n')
             raise gen.Return(response[:-2])

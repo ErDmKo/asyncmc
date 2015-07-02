@@ -24,11 +24,14 @@ class FooStruct(object):
 class ConnectionCommandsTest(BaseTest):
     def setUp(self):
         super(ConnectionCommandsTest, self).setUp()
-        self.mcache = Client(debug=1)
+        self.mcache = Client(servers=[
+            'localhost:11211'
+        ], debug=1)
+        self.mcache.flush_all(noreply=True)
 
     def tearDown(self):
-        yield self.mcache.close()
         super(ConnectionCommandsTest, self).tearDown()
+        self.mcache.close()
 
     @run_until_complete
     def test_utils(self):
@@ -348,22 +351,22 @@ class ConnectionCommandsTest(BaseTest):
 
     @run_until_complete
     def test_delete(self):
+        key_noreply, value_noreply = 'key:no_repleay', 'value_norep'
+        yield self.check_setget(key_noreply, value_noreply)
+
         key, value = b'key:delete', b'value'
         yield self.check_setget(key, value)
 
-        key_noreply, value_noreply = 'key:delete2', 'value_str'
-        yield self.check_setget(key_noreply, value_noreply)
-
         key_str, value_str = 'key:delete1', 'value_str'
         yield self.check_setget(key_str, value_str)
+
+        is_deleted = yield self.mcache.delete(key_noreply, noreply=True)
+        self.assertTrue(is_deleted)
 
         is_deleted = yield self.mcache.delete(key)
         self.assertTrue(is_deleted)
 
         is_deleted = yield self.mcache.delete(key_str)
-        self.assertTrue(is_deleted)
-
-        is_deleted = yield self.mcache.delete(key_noreply, noreply=True)
         self.assertTrue(is_deleted)
 
         # make sure value does not exists

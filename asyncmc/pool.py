@@ -1,9 +1,13 @@
 import logging
 import tornado.ioloop
+import socket
+import binascii
 from tornado import gen
 from toro import Queue, Full, Empty
 
 from .host import Host
+from . import constants as const
+from .exceptions import ValidationException
 
 
 class ConnectionPool(object):
@@ -80,19 +84,59 @@ class Connection(object):
         return cls(servers, debug=debug)
 
     @gen.coroutine
+    def send_cmd_all(self, cmd, *arg, **kw):
+        res = []
+        for host in self.hosts:
+            try:
+                server_resp = yield host.send_cmd(cmd, *arg, **kw)
+                res.append(server_resp)
+            except socket.error as msg:
+                if isinstance(msg, tuple):
+                    msg = msg[1]
+                host.mark_dead(msg)
+        raise gen.Return(res)
+
+    @gen.coroutine
     def send_cmd(self, cmd, *arg, **kw):
-        res = yield self.hosts[hash(cmd) % len(self.hosts)] \
+        res = yield self.hosts[self._cmemcache_hash(cmd) % len(self.hosts)] \
             .send_cmd(cmd, *arg, **kw)
         raise gen.Return(res)
 
+    def _cmemcache_hash(self, key):
+        if isinstance(key, str):
+            try:
+                key = key.encode('utf-8')
+            except UnicodeDecodeError as e:
+                raise ValidationException('Hash exception', e)
+        try:
+            res = (
+                (((
+                    binascii.crc32(key) & 0xffffffff
+                ) >> 16) & 0x7fff) or 1
+            )
+        except Exception as e:
+            raise ValidationException('Hash exception', e)
+        return res
+
+    def _get_server(self, key):
+        if isinstance(key, tuple):
+            serverhash, key = key
+        else:
+            serverhash = self._cmemcache_hash(key)
+
+        if not self.hosts:
+            return None, None
+
+        for i in range(const.SERVER_RETRIES):
+            server = self.hosts[serverhash % len(self.hosts)]
+            return server._ensure_connection(), key
+        return None, None
+
     def get_stream(self, cmd, *arg, **kw):
-        hosts = self.hosts[hash(cmd) % len(self.hosts)] \
+        hosts = self.hosts[self._cmemcache_hash(cmd) % len(self.hosts)] \
             ._ensure_connection()
         return hosts.stream
 
     def close_socket(self):
         for host in self.hosts:
             host.close_socket()
-
-    def get_server_for_key(self, key):
-        return self.hosts[hash(key) % len(self.hosts)]
