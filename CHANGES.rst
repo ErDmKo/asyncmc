@@ -1,13 +1,18 @@
 CHANGES
 ========
 
+0.6.1 (1-10-2015)
+---------------
+
+- Bug fix and preparing to reconnect dead connections by errors
+
 0.6 (2-07-2015)
-----------------
+---------------
 
 - New feature Multiply server connection
 
 0.5.1 (27-06-2015)
-----------------
+------------------
 
 - Documentation improve
 

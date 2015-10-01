@@ -7,7 +7,7 @@ from toro import Queue, Full, Empty
 
 from .host import Host
 from . import constants as const
-from .exceptions import ValidationException
+from .exceptions import ValidationException, ConnectionDeadError
 
 
 class ConnectionPool(object):
@@ -90,10 +90,20 @@ class Connection(object):
             try:
                 server_resp = yield host.send_cmd(cmd, *arg, **kw)
                 res.append(server_resp)
+            except ConnectionDeadError as msg:
+                host.mark_dead(msg)
             except socket.error as msg:
                 if isinstance(msg, tuple):
                     msg = msg[1]
                 host.mark_dead(msg)
+        if not len(res):
+            raise ConnectionDeadError(
+                'no alive connetions {}'.format(
+                    ', '.join(
+                        map(lambda h: h.disconect_reason, self.hosts)
+                    )
+                )
+            )
         raise gen.Return(res)
 
     @gen.coroutine
@@ -129,7 +139,7 @@ class Connection(object):
 
         for i in range(const.SERVER_RETRIES):
             server = self.hosts[serverhash % len(self.hosts)]
-            return server._ensure_connection(), key
+            return server, key
         return None, None
 
     def get_stream(self, cmd, *arg, **kw):

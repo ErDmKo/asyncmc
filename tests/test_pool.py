@@ -1,6 +1,7 @@
 from time import sleep
 from ._testutil import run_until_complete, BaseTest
 from asyncmc.pool import ConnectionPool, Connection
+from asyncmc.exceptions import ConnectionDeadError
 
 
 class PoolTest(BaseTest):
@@ -12,19 +13,19 @@ class PoolTest(BaseTest):
 
     @run_until_complete
     def test_pool_creation(self):
-        pool = ConnectionPool(['memcached:11211'], debug=1)
+        pool = ConnectionPool(['localhost:11211'], debug=1)
         self.assertEqual(pool.size(), 0)
 
     @run_until_complete
     def test_pool_acquire_release(self):
-        pool = ConnectionPool(['memcached:11211'], debug=1)
+        pool = ConnectionPool(['localhost:11211'], debug=1)
         conn = yield pool.acquire()
         self.assertIsInstance(conn, Connection)
         pool.release(conn)
 
     @run_until_complete
     def test_pool_clear(self):
-        pool = ConnectionPool(['memcached:11211'], debug=1)
+        pool = ConnectionPool(['localhost:11211'], debug=1)
         conn = yield pool.acquire()
         pool.release(conn)
         self.assertEqual(pool.size(), 1)
@@ -32,9 +33,28 @@ class PoolTest(BaseTest):
         self.assertEqual(pool._pool.qsize(), 0)
 
     @run_until_complete
+    def test_pool_half_connection(self):
+        pool = ConnectionPool([
+            'localhost:11211',
+        ])
+        conn = yield pool.acquire()
+        yield conn.send_cmd_all(b'!')
+        pool.release(conn)
+
+    @run_until_complete
+    def test_pool_conntection_excetion(self):
+        pool = ConnectionPool(
+            ['some_host:1233123']
+        )
+        conn = yield pool.acquire()
+        with self.assertRaises(ConnectionDeadError):
+            yield conn.send_cmd_all(b'!')
+            pool.release(conn)
+
+    @run_until_complete
     def test_pool_is_full(self):
         pool = ConnectionPool(
-            ['memcached:11211'],
+            ['localhost:11211'],
             minsize=1,
             maxsize=2,
             debug=1

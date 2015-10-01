@@ -10,5 +10,9 @@ class ClientException(Exception):
         super(Exception, self).__init__(msg)
 
 
+class ConnectionDeadError(ClientException):
+    """Raised when can not connect to the server"""
+
+
 class ValidationException(ClientException):
     """Raised when an invalid parameter is passed to a ``Client`` function."""
