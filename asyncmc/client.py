@@ -428,6 +428,58 @@ class Client(object):
             raise ClientException('Memcached delete failed', response)
         raise gen.Return(response == const.DELETED or noreply)
 
+    @acquire
+    @gen.coroutine
+    def incr(self, conn, key, value=1, noreply=False):
+        """Increments a key on the server by the given amount.
+
+        If the key doesn't exist or doesn't contain an integer, this command will fail.
+
+        @return: The new value on success; otherwise raises ClientException
+
+        @param noreply: optional parameter that instructs the server not to
+            send the reply
+
+        Returns
+        """
+        server, key = conn._get_server(key)
+
+        value = str(value).encode('ascii')
+
+        command = b'incr ' + key + b' ' + value + (b' noreply' if noreply else b'')
+        response = yield server.send_cmd(command, noreply)
+
+        if response == const.NOT_FOUND:
+            raise ClientException('Key {0} not found'.format(key))
+        raise tornado.gen.Return(int(response))
+
+    @acquire
+    @gen.coroutine
+    def decr(self, conn, key, value=1, noreply=False):
+        """Decrements a key on the server by the given amount.
+
+        If the key doesn't exist or doesn't contain an integer, this command will fail.
+
+        If you attempt to decrement 0, the new result will be 0.
+
+        @return: The new value on success; otherwise raises ClientException
+
+        @param noreply: optional parameter that instructs the server not to
+            send the reply
+
+        Returns
+        """
+        server, key = conn._get_server(key)
+
+        value = str(value).encode('ascii')
+
+        command = b'decr ' + key + b' ' + value + (b' noreply' if noreply else b'')
+        response = yield server.send_cmd(command, noreply)
+
+        if response == const.NOT_FOUND:
+            raise ClientException('Key {0} not found'.format(key))
+        raise tornado.gen.Return(int(response))
+
     @gen.coroutine
     def _storage_command(self, conn, command, key, value,
                          exptime=0, noreply=False):

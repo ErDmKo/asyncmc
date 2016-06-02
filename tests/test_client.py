@@ -407,3 +407,19 @@ class ConnectionCommandsTest(BaseTest):
         self.assertEqual(test_value, [None, value2])
         test_value = yield self.mcache.multi_get()
         self.assertEqual(test_value, [])
+
+    @run_until_complete
+    def test_incr(self):
+        key = b'key1'
+        yield self.mcache.set(key, 0)
+        yield self.mcache.incr(key)
+        found_value = int((yield self.mcache.get(key)))
+        self.assertEqual(found_value, 1)
+
+    @run_until_complete
+    def test_decr(self):
+        key = b'key1'
+        yield self.mcache.set(key, 2)
+        yield self.mcache.decr(key)
+        found_value = int((yield self.mcache.get(key)))
+        self.assertEqual(found_value, 1)
