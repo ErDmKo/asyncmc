@@ -433,7 +433,8 @@ class Client(object):
     def incr(self, conn, key, value=1, noreply=False):
         """Increments a key on the server by the given amount.
 
-        If the key doesn't exist or doesn't contain an integer, this command will fail.
+        If the key doesn't exist or doesn't contain an integer, this command
+        will fail.
 
         @return: The new value on success; otherwise raises ClientException
 
@@ -446,7 +447,8 @@ class Client(object):
 
         value = str(value).encode('ascii')
 
-        command = b'incr ' + key + b' ' + value + (b' noreply' if noreply else b'')
+        command = b'incr ' + key + b' ' + value + \
+            (b' noreply' if noreply else b'')
         response = yield server.send_cmd(command, noreply)
 
         if response == const.NOT_FOUND:
@@ -458,7 +460,8 @@ class Client(object):
     def decr(self, conn, key, value=1, noreply=False):
         """Decrements a key on the server by the given amount.
 
-        If the key doesn't exist or doesn't contain an integer, this command will fail.
+        If the key doesn't exist or doesn't contain an integer, this command
+        will fail.
 
         If you attempt to decrement 0, the new result will be 0.
 
@@ -473,7 +476,8 @@ class Client(object):
 
         value = str(value).encode('ascii')
 
-        command = b'decr ' + key + b' ' + value + (b' noreply' if noreply else b'')
+        command = b'decr ' + key + b' ' + value + \
+            (b' noreply' if noreply else b'')
         response = yield server.send_cmd(command, noreply)
 
         if response == const.NOT_FOUND:
