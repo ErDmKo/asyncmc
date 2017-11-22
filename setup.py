@@ -2,14 +2,13 @@ import os
 import sys
 from setuptools import setup, find_packages
 
-version = '0.6.1'
+version = '0.6.2'
 
 def read(f):
     return open(os.path.join(os.path.dirname(__file__), f)).read().strip()
 
 install_requires = [
-    'tornado>=4.1',
-    'toro>=0.8'
+    'tornado>=4.1'
 ]
 
 setup(name='asyncmc',
