@@ -149,7 +149,7 @@ class Client(object):
         response = yield conn.send_cmd(command)
         if not response.startswith(const.VERSION):
             raise ClientException('Memcached version failed', response)
-        version, number = response.split()
+        version, number = response.split()[:2]
         raise gen.Return(number)
 
     def _key_type(self, key_list=[], key=None):
