@@ -125,6 +125,8 @@ class Client(object):
         resp = yield conn.send_cmd(cmd)
         result = {}
         while resp != b'END\r\n':
+            # Ubuntu response fix
+            resp = resp.replace(" (Ubuntu)", "")
             terms = resp.split()
 
             if len(terms) == 2 and terms[0] == b'STAT':
