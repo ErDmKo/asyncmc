@@ -126,7 +126,7 @@ class Client(object):
         result = {}
         while resp != b'END\r\n':
             # Ubuntu response fix
-            resp = resp.replace(" (Ubuntu)", "") if not isinstance(resp, bytes) else resp.replace(b" (Ubuntu)", b"")
+            resp = resp.replace(type(resp)(" (Ubuntu)"), type(resp)(""))
             terms = resp.split()
 
             if len(terms) == 2 and terms[0] == b'STAT':
