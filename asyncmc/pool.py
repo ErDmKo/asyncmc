@@ -3,7 +3,7 @@ import tornado.ioloop
 import socket
 import binascii
 from tornado import gen
-from toro import Queue, Full, Empty
+from tornado.queues import Queue, QueueEmpty, QueueFull
 
 from .host import Host
 from . import constants as const
@@ -25,7 +25,7 @@ class ConnectionPool(object):
         self._minsize = minsize
         self._debug = debug
         self._in_use = set()
-        self._pool = Queue(maxsize, io_loop=self._loop)
+        self._pool = Queue(maxsize)
 
     @gen.coroutine
     def clear(self):
@@ -68,7 +68,7 @@ class ConnectionPool(object):
         self._in_use.remove(conn)
         try:
             self._pool.put_nowait(conn)
-        except (Empty, Full):
+        except (QueueEmpty, QueueFull):
             conn.close_socket()
 
 

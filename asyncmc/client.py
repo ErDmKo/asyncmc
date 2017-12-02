@@ -125,6 +125,8 @@ class Client(object):
         resp = yield conn.send_cmd(cmd)
         result = {}
         while resp != b'END\r\n':
+            # Ubuntu response fix
+            resp = resp.replace(type(resp)(" (Ubuntu)"), type(resp)(""))
             terms = resp.split()
 
             if len(terms) == 2 and terms[0] == b'STAT':
@@ -149,7 +151,10 @@ class Client(object):
         response = yield conn.send_cmd(command)
         if not response.startswith(const.VERSION):
             raise ClientException('Memcached version failed', response)
-        version, number = response.split()
+
+        response = response.split()
+        number = response[1]
+
         raise gen.Return(number)
 
     def _key_type(self, key_list=[], key=None):
