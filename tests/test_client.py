@@ -47,7 +47,7 @@ class ConnectionCommandsTest(BaseTest):
     def test_version(self):
         version = yield self.mcache.version()
         stats = yield self.mcache.stats()
-        self.assertEqual(version, stats[b'version'])
+        self.assertEqual(version, stats[b'version'].split()[0])
 
     @run_until_complete
     def test_replace(self):

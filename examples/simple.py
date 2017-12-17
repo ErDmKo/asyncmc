@@ -15,4 +15,5 @@ def out():
     print(values)
     yield mc.delete(b"another_key")
 
+
 i_loop.run_sync(out)
