@@ -2,7 +2,7 @@ import os
 import sys
 from setuptools import setup, find_packages
 
-version = '0.6.1'
+version = '0.6.2'
 
 def read(f):
     return open(os.path.join(os.path.dirname(__file__), f)).read().strip()
@@ -15,7 +15,7 @@ install_requires = [
 setup(name='asyncmc',
       version=version,
       description=('Minimal pure python tornado memcached client'),
-      long_description='\n\n'.join((read('README.rst'), read('CHANGES.rst'))),
+      long_description='\n\n'.join((read('README.md'), read('CHANGES.md'))),
       classifiers=[
           'License :: OSI Approved :: MIT License',
           'Development Status :: 3 - Alpha',
