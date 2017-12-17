@@ -131,6 +131,8 @@ class Client(object):
                 result[terms[1]] = None
             elif len(terms) == 3 and terms[0] == b'STAT':
                 result[terms[1]] = terms[2]
+            elif len(terms) >= 3 and terms[0] == b'STAT':
+                result[terms[1]] = b' '.join(terms[2:])
             else:
                 raise ClientException('stats failed', resp)
 
@@ -149,7 +151,7 @@ class Client(object):
         response = yield conn.send_cmd(command)
         if not response.startswith(const.VERSION):
             raise ClientException('Memcached version failed', response)
-        version, number = response.split()
+        version, number = response.split()[:2]
         raise gen.Return(number)
 
     def _key_type(self, key_list=[], key=None):

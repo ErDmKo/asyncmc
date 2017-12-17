@@ -2,7 +2,7 @@ PYTHON=python
 PYFLAKES=pyflakes
 
 pep:
-	pep8 asyncmc examples tests
+	pycodestyle asyncmc examples tests
 
 flake:
 	$(PYFLAKES) asyncmc examples tests
