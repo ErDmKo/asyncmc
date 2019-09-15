@@ -7,8 +7,13 @@ version = '0.6.7'
 def read(f):
     return open(os.path.join(os.path.dirname(__file__), f)).read().strip()
 
+req = 'tornado>=4.2'
+
+if sys.version_info[0] == 2:
+    req = 'tornado==4.2'
+
 install_requires = [
-    'tornado==4.2'
+    req
 ]
 
 setup(name='asyncmc',
