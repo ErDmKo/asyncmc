@@ -8,7 +8,7 @@ def read(f):
     return open(os.path.join(os.path.dirname(__file__), f)).read().strip()
 
 install_requires = [
-    'tornado>=4.2'
+    'tornado==4.2'
 ]
 
 setup(name='asyncmc',
