@@ -3,7 +3,12 @@ import tornado.ioloop
 import socket
 import binascii
 from tornado import gen
-from toro import Queue, Full, Empty
+try:
+    from toro import Queue, Full as QueueFull, Empty as QueueEmpty
+    using_toro = True
+except ImportError:
+    from asyncio import Queue, QueueFull, QueueEmpty
+    using_toro = False
 
 from .host import Host
 from . import constants as const
@@ -20,12 +25,15 @@ class ConnectionPool(object):
                 format="'%(levelname)s %(asctime)s"
                 " %(module)s:%(lineno)d %(process)d %(thread)d %(message)s'"
             )
-        self._loop = loop
         self._servers = servers
         self._minsize = minsize
         self._debug = debug
         self._in_use = set()
-        self._pool = Queue(maxsize, io_loop=self._loop)
+        if using_toro:
+            self._loop = loop
+            self._pool = Queue(maxsize, io_loop=self._loop)
+        else:
+            self._pool = Queue(maxsize)
 
     @gen.coroutine
     def clear(self):
@@ -68,7 +76,7 @@ class ConnectionPool(object):
         self._in_use.remove(conn)
         try:
             self._pool.put_nowait(conn)
-        except (Empty, Full):
+        except (QueueEmpty, QueueFull):
             conn.close_socket()
 
 
